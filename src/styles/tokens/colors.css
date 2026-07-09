@@ -1,0 +1,122 @@
+/* Gangnamunni — Color tokens
+   Base palette (Cell base scale) + semantic aliases.
+   Source: prose-derived token extraction, 2026-06-09 (see readme.md). */
+
+:root {
+  /* ---- Base: Orange (brand) ---- */
+  --cell-orange-50: #fef6f4;
+  --cell-orange-100: #feeee9;
+  --cell-orange-200: #fbb8a4;
+  --cell-orange-300: #fa8563;
+  --cell-orange-400: #f66336;
+  --cell-orange-500: #d54300; /* brand strong */
+  --cell-orange-600: #ab350c;
+  --cell-orange-700: #93250a;
+  --cell-orange-accent: #ff540f; /* raw accent — hot-deal fills */
+
+  /* ---- Base: Bluegray (neutral) ---- */
+  --cell-bluegray-50: #f7f9fa;
+  --cell-bluegray-100: #eff2f5;
+  --cell-bluegray-150: #e4e8ec;
+  --cell-bluegray-200: #d8dfe6;
+  --cell-bluegray-300: #b5bfc9;
+  --cell-bluegray-400: #8694a2;
+  --cell-bluegray-500: #697683;
+  --cell-bluegray-600: #515e6a;
+  --cell-bluegray-700: #3a444d;
+  --cell-bluegray-800: #21272d;
+  --cell-bluegray-900: #131517;
+  --cell-white: #ffffff;
+
+  /* Footer-only neutral (not part of the 9-step ramp) */
+  --cell-footer-bg: #f5f5f5;
+  --cell-footer-divider: #d6d6d6;
+
+  /* ---- Base: Status ---- */
+  --cell-green-100: #e8f6ec;
+  --cell-green-200: #d5ebdc;
+  --cell-green-400: #27a86d;
+  --cell-green-500: #1a8656;
+
+  --cell-red-50: #fff6f5;
+  --cell-red-100: #ffedeb;
+  --cell-red-200: #fbb7af;
+  --cell-red-400: #f75e54;
+  --cell-red-500: #d73f39;
+  --cell-red-600: #b02b27;
+
+  --cell-yellow-100: #fff0d3;
+  --cell-yellow-200: #fff8e9;
+  --cell-yellow-400: #f9c647;
+
+  --cell-blue-100: #ebf2ff;
+  --cell-blue-200: #f5f9ff;
+  --cell-blue-500: #3270d6;
+  --cell-blue-600: #1b59bd;
+
+  --cell-lightblue-500: #0b819d; /* payment / refund accents */
+  --cell-pink-300: #f5b8c4; /* trending chips only — never brand/CTA */
+
+  /* ================= Semantic aliases ================= */
+
+  /* Brand */
+  --brand: var(--cell-orange-500);
+  --brand-regular: var(--cell-orange-400);
+  --brand-strong-fg: var(--cell-orange-600);
+  --brand-accent-raw: var(--cell-orange-accent);
+  --brand-subtle-border: var(--cell-orange-300);
+  --brand-tint-100: var(--cell-orange-100);
+  --brand-tint-50: var(--cell-orange-50);
+  --brand-disabled: var(--cell-orange-200);
+  --brand-pressed: var(--cell-orange-700);
+
+  /* Surfaces */
+  --surface-canvas: var(--cell-white);
+  --surface-subtle: var(--cell-bluegray-100);
+  --surface-faint: var(--cell-bluegray-50);
+  --surface-footer: var(--cell-footer-bg);
+
+  /* Text */
+  --text-heading: var(--cell-bluegray-900);
+  --text-body: var(--cell-bluegray-700);
+  --text-body-long: var(--cell-bluegray-600);
+  --text-caption: var(--cell-bluegray-500);
+  --text-placeholder: var(--cell-bluegray-400);
+  --text-inverse: var(--cell-white);
+  --text-strong-border: var(--cell-bluegray-800);
+
+  /* Borders */
+  --border-default: var(--cell-bluegray-200);
+  --border-weak: var(--cell-bluegray-150);
+  --border-strong: var(--cell-bluegray-300);
+  --border-footer: var(--cell-footer-divider);
+
+  /* Status semantics */
+  --success-fg: var(--cell-green-400);
+  --success-strong: var(--cell-green-500);
+  --success-tint: var(--cell-green-100);
+  --success-tint-strong: var(--cell-green-200);
+
+  --danger-fg: var(--cell-red-500);
+  --danger-strong: var(--cell-red-600);
+  --danger-accent: var(--cell-red-400);
+  --danger-tint: var(--cell-red-100);
+  --danger-tint-faint: var(--cell-red-50);
+  --danger-border: var(--cell-red-200);
+
+  --warning-fg: var(--cell-yellow-400);
+  --warning-tint: var(--cell-yellow-100);
+  --warning-tint-faint: var(--cell-yellow-200);
+
+  --info-fg: var(--cell-blue-500);
+  --info-strong: var(--cell-blue-600);
+  --info-tint: var(--cell-blue-100);
+  --info-tint-faint: var(--cell-blue-200);
+
+  --payment-fg: var(--cell-lightblue-500);
+  --trending-border: var(--cell-pink-300);
+
+  /* Links */
+  --link-default: var(--brand-regular);
+  --link-hover: var(--brand-strong-fg);
+}

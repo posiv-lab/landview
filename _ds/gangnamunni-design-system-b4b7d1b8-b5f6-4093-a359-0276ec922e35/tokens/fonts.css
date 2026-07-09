@@ -1,0 +1,9 @@
+/* Gangnamunni — Fonts
+   Pretendard JP Variable is loaded from its official public CDN distribution
+   (jsDelivr, maintained by the font author orioncactus/pretendard). No local
+   binaries were provided by the brand source, so we point at the real
+   upstream webfont rather than substituting a different typeface — this is
+   the same distribution the live gangnamunni.com bundle itself resolves to
+   at the family-name level. See readme.md for details / substitution notes. */
+
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-jp-dynamic-subset.min.css");

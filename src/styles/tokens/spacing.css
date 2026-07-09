@@ -1,0 +1,78 @@
+/* Gangnamunni — Spacing, radius, shadow tokens */
+
+:root {
+  /* Spacing scale (rem values converted to px at 16px root) */
+  --space-25: 1px;
+  --space-50: 2px;
+  --space-75: 3px;
+  --space-100: 4px;
+  --space-150: 6px;
+  --space-200: 8px;
+  --space-250: 10px;
+  --space-300: 12px;
+  --space-350: 14px;
+  --space-400: 16px;
+  --space-500: 20px;
+  --space-600: 24px;
+  --space-700: 28px;
+  --space-800: 32px;
+  --space-900: 36px;
+  --space-1000: 40px;
+  --space-1200: 48px;
+  --space-1400: 56px;
+  --space-1600: 64px;
+  --space-1800: 72px;
+  --space-2000: 80px;
+  --space-2400: 96px;
+
+  /* Semantic spacing aliases */
+  --space-xs: var(--space-100);
+  --space-sm: var(--space-200);
+  --space-md: var(--space-300);
+  --space-base: var(--space-400);
+  --space-lg: var(--space-500);
+  --space-xl: var(--space-800);
+  --space-section: var(--space-1200);
+}
+
+:root {
+  /* Radius scale */
+  --radius-100: 4px;
+  --radius-200: 8px;
+  --radius-300: 12px;
+  --radius-400: 16px; /* default chrome radius — buttons, pills, cards */
+  --radius-500: 20px;
+  --radius-600: 24px;
+  --radius-800: 32px;
+  --radius-full: 9999px;
+}
+
+:root {
+  /* Shadows — reserved for popover/sheet/modal only, never resting cards */
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-modal-backdrop: rgba(19, 21, 23, 0.6);
+}
+
+:root {
+  /* Motion */
+  --motion-instant: 0ms; /* @kind other */
+  --motion-fast: 150ms; /* @kind other */
+  --motion-standard: 250ms; /* @kind other */
+  --motion-slow: 350ms; /* @kind other */
+  --motion-page: 320ms; /* @kind other */
+
+  --ease-enter: cubic-bezier(0.0, 0.0, 0.2, 1); /* @kind other */
+  --ease-exit: cubic-bezier(0.4, 0.0, 1, 1); /* @kind other */
+  --ease-standard: cubic-bezier(0.4, 0.0, 0.2, 1); /* @kind other */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms; /* @kind other */
+    --motion-fast: 0ms; /* @kind other */
+    --motion-standard: 0ms; /* @kind other */
+    --motion-slow: 0ms; /* @kind other */
+    --motion-page: 0ms; /* @kind other */
+  }
+}

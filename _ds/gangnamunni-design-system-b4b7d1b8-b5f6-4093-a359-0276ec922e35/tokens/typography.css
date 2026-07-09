@@ -1,0 +1,74 @@
+/* Gangnamunni — Typography tokens */
+
+:root {
+  --font-sans: "Pretendard JP Variable", "PretendardVariable", "PretendardVariable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Weights */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Size ramp (--cell-base-font-size-*) */
+  --size-100: 11px;
+  --size-200: 12px;
+  --size-300: 13px;
+  --size-400: 14px;
+  --size-500: 16px;
+  --size-600: 18px;
+  --size-700: 20px;
+  --size-800: 22px;
+  --size-900: 24px;
+  --size-1000: 28px;
+  --size-1100: 32px;
+  --size-1200: 36px;
+  --size-1300: 40px;
+  --size-1400: 44px;
+  --size-1500: 48px;
+
+  --tracking-none: 0;
+  --tracking-display: 0.01em; /* rare — display-strongest only */
+
+  /* Semantic type styles: size / weight / line-height */
+  --type-meta-size: var(--size-100);
+  --type-meta-weight: var(--weight-regular);
+  --type-meta-lh: 1.4;
+
+  --type-label-xs-size: var(--size-200);
+  --type-label-xs-weight: var(--weight-medium);
+  --type-label-xs-lh: 1.4;
+
+  --type-label-sm-size: var(--size-300);
+  --type-label-sm-weight: var(--weight-medium);
+  --type-label-sm-lh: 1.4;
+
+  --type-body-size: var(--size-400);
+  --type-body-weight: var(--weight-regular);
+  --type-body-lh: 1.5;
+
+  --type-body-lg-size: var(--size-500);
+  --type-body-lg-weight: var(--weight-regular);
+  --type-body-lg-lh: 1.5;
+
+  --type-subhead-size: var(--size-600);
+  --type-subhead-weight: var(--weight-semibold);
+  --type-subhead-lh: 1.4;
+
+  --type-title-md-size: var(--size-700);
+  --type-title-md-weight: var(--weight-bold);
+  --type-title-md-lh: 1.4;
+
+  --type-title-lg-size: var(--size-900);
+  --type-title-lg-weight: var(--weight-bold);
+  --type-title-lg-lh: 1.3;
+
+  --type-display-md-size: var(--size-1000);
+  --type-display-md-weight: var(--weight-bold);
+  --type-display-md-lh: 1.3;
+
+  --type-title-xl-size: var(--size-1100);
+  --type-title-xl-weight: var(--weight-bold);
+  --type-title-xl-lh: 1.3;
+}
