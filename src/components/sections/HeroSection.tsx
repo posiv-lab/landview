@@ -22,12 +22,12 @@ export function HeroSection() {
           </div>
           <SearchBox />
           <div className="hero__actions">
+            <Button href="#contact" size="lg">
+              서비스 문의하기
+            </Button>
             <Button href="#features" size="lg" variant="secondary">
               주요 기능 살펴보기
               <ArrowDown aria-hidden="true" size={18} />
-            </Button>
-            <Button href="#waitlist" size="lg" variant="subtle">
-              출시 알림 받기
             </Button>
           </div>
           <div className="trust-strip">

@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 type ButtonVariant = "primary" | "secondary" | "subtle" | "ghost";
 type ButtonSize = "sm" | "md" | "lg";
 
-type ButtonProps = {
+export type ButtonProps = {
   children: ReactNode;
   href?: string;
   variant?: ButtonVariant;

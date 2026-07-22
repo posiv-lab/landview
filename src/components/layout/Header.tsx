@@ -1,6 +1,7 @@
 import { Map } from "lucide-react";
 import { navLinks } from "@/data/landingContent";
 import { Button } from "@/components/ui/Button";
+import { ContactButton } from "@/components/contact/ContactDialog";
 
 export function Header() {
   return (
@@ -23,7 +24,7 @@ export function Header() {
           <Button href="#features" variant="secondary">
             기능 보기
           </Button>
-          <Button href="#waitlist">출시 알림</Button>
+          <ContactButton>문의하기</ContactButton>
         </div>
       </div>
     </header>

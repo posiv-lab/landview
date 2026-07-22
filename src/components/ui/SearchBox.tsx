@@ -6,7 +6,7 @@ import { Button } from "./Button";
 
 export function SearchBox() {
   const [region, setRegion] = useState("");
-  const [message, setMessage] = useState("예시 지역을 입력하면 출시 알림 신청으로 이어집니다.");
+  const [message, setMessage] = useState("예시 지역을 입력하면 문의 폼으로 이어집니다.");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,8 +17,8 @@ export function SearchBox() {
       return;
     }
 
-    setMessage(`${normalized} 지역은 출시 알림 신청에서 관심 지역으로 남길 수 있습니다.`);
-    document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setMessage(`${normalized} 지역은 문의 폼의 관심 지역에 남길 수 있습니다.`);
+    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (

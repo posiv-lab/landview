@@ -1,16 +1,16 @@
-import { LeadForm } from "@/components/ui/LeadForm";
+import { ContactForm } from "@/components/contact/ContactForm";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 
 export function FinalCtaSection() {
   return (
-    <section className="section section--tint" id="waitlist">
+    <section className="section section--tint" id="contact">
       <div className="container final-cta">
         <div className="section-header">
-          <p className="eyebrow">출시 알림</p>
-          <h2 className="section-title">지금 땅뷰에서 관심 지역의 땅 정보를 확인해보세요</h2>
+          <p className="eyebrow">서비스 문의</p>
+          <h2 className="section-title">궁금한 지역이나 필요한 기능을 알려주세요</h2>
           <p className="section-description">
-            초기 제공 지역과 데이터 연동 범위가 확정되면 신청자에게 먼저 안내드리겠습니다.
+            토지 데이터, 제공 지역, 서비스 기능에 관한 문의를 남겨주시면 확인 후 연락드리겠습니다.
           </p>
           <div className="hero__trust">
             <Badge variant="neutral">개인정보 동의 분리</Badge>
@@ -18,7 +18,7 @@ export function FinalCtaSection() {
           </div>
         </div>
         <Card>
-          <LeadForm />
+          <ContactForm source="inline" />
         </Card>
       </div>
     </section>

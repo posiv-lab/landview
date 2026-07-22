@@ -1,11 +1,11 @@
-import { Button } from "@/components/ui/Button";
+import { ContactButton } from "@/components/contact/ContactDialog";
 
 export function MobileStickyCta() {
   return (
     <div className="mobile-sticky-cta">
-      <Button fullWidth href="#waitlist" size="lg">
-        출시 알림 신청하기
-      </Button>
+      <ContactButton fullWidth size="lg">
+        문의하기
+      </ContactButton>
     </div>
   );
 }
