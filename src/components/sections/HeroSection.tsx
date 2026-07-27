@@ -22,8 +22,8 @@ export function HeroSection() {
           </div>
           <SearchBox />
           <div className="hero__actions">
-            <Button href="#contact" size="lg">
-              서비스 문의하기
+            <Button href="/map" size="lg">
+              지도에서 시작하기
             </Button>
             <Button href="#features" size="lg" variant="secondary">
               주요 기능 살펴보기
