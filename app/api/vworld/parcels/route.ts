@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "edge";
+export const preferredRegion = "icn1";
+
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
 const PARCEL_LAYER_ID = "LP_PA_CBND_BUBUN";
 const MAX_LONGITUDE_SPAN = 0.08;
