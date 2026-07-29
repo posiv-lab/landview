@@ -176,6 +176,7 @@ export function KakaoMapWorkspace({
   vworldConfigured
 }: KakaoMapWorkspaceProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const parcelDetailRef = useRef<HTMLElement>(null);
   const mapsApiRef = useRef<KakaoMapsNamespace | null>(null);
   const mapRef = useRef<KakaoMap | null>(null);
   const markerRef = useRef<KakaoMarker | null>(null);
@@ -185,6 +186,7 @@ export function KakaoMapWorkspace({
   const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
   const parcelRequestRef = useRef<AbortController | null>(null);
   const parcelLayerEnabledRef = useRef(false);
+  const parcelClickGuardRef = useRef(false);
   const refreshParcelsRef = useRef<() => void>(() => undefined);
 
   const [mapStatus, setMapStatus] = useState<MapStatus>(appKey ? "loading" : "missing-key");
@@ -336,6 +338,9 @@ export function KakaoMapWorkspace({
         renderedParcelCount += 1;
 
         const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+          maps.event.preventMap();
+          parcelClickGuardRef.current = true;
+
           selectedParcelPolygonsRef.current.forEach((polygon) => {
             polygon.setOptions(DEFAULT_PARCEL_STYLE);
           });
@@ -351,6 +356,10 @@ export function KakaoMapWorkspace({
           );
           setSearchMessage("필지를 선택했습니다.");
           moveMarker(latLng);
+
+          window.requestAnimationFrame(() => {
+            parcelClickGuardRef.current = false;
+          });
         };
 
         featurePolygons.forEach((polygon) => {
@@ -376,6 +385,17 @@ export function KakaoMapWorkspace({
       void refreshParcels();
     };
   }, [refreshParcels]);
+
+  useEffect(() => {
+    if (!selectedParcel) {
+      return;
+    }
+
+    parcelDetailRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
+  }, [selectedParcel]);
 
   useEffect(() => {
     if (!appKey || !mapContainerRef.current) {
@@ -405,6 +425,10 @@ export function KakaoMapWorkspace({
         geocoderRef.current = new maps.services.Geocoder();
 
         clickHandler = ({ latLng }) => {
+          if (parcelClickGuardRef.current) {
+            return;
+          }
+
           clearSelectedParcel();
           moveMarker(latLng);
           setSelectedCoordinates(
@@ -469,6 +493,7 @@ export function KakaoMapWorkspace({
       });
       parcelPolygonsRef.current = [];
       selectedParcelPolygonsRef.current = [];
+      parcelClickGuardRef.current = false;
       markerRef.current?.setMap(null);
     };
   }, [appKey, clearSelectedParcel]);
@@ -529,7 +554,7 @@ export function KakaoMapWorkspace({
     loading: "현재 지도 영역의 필지를 불러오는 중입니다.",
     ready:
       parcelCount > 0
-        ? `필지 경계 ${parcelCount.toLocaleString("ko-KR")}개를 표시했습니다.`
+        ? `필지 경계 ${parcelCount.toLocaleString("ko-KR")}개를 표시했습니다. 주황색 필지 안쪽을 클릭해 보세요.`
         : "현재 영역에서 필지 경계를 찾지 못했습니다.",
     "zoom-in": "지도를 더 확대하면 필지 경계가 표시됩니다.",
     "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
@@ -590,7 +615,7 @@ export function KakaoMapWorkspace({
           </section>
 
           {selectedParcel ? (
-            <section className="parcel-detail" aria-live="polite">
+            <section className="parcel-detail" aria-live="polite" ref={parcelDetailRef}>
               <div className="parcel-detail__header">
                 <div>
                   <span>선택 필지</span>

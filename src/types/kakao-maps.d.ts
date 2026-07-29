@@ -91,6 +91,7 @@ declare global {
       strokeWeight: number;
     }) => KakaoPolygon;
     event: {
+      preventMap(): void;
       addListener(
         target: KakaoMap | KakaoPolygon,
         type: "click" | "idle",
