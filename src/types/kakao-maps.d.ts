@@ -25,6 +25,13 @@ declare global {
 
   interface KakaoPolygon {
     setMap(map: KakaoMap | null): void;
+    setOptions(options: {
+      fillColor?: string;
+      fillOpacity?: number;
+      strokeColor?: string;
+      strokeOpacity?: number;
+      strokeWeight?: number;
+    }): void;
   }
 
   interface KakaoPlace {
@@ -85,12 +92,12 @@ declare global {
     }) => KakaoPolygon;
     event: {
       addListener(
-        target: KakaoMap,
+        target: KakaoMap | KakaoPolygon,
         type: "click" | "idle",
         handler: (event: { latLng: KakaoLatLng }) => void
       ): void;
       removeListener(
-        target: KakaoMap,
+        target: KakaoMap | KakaoPolygon,
         type: "click" | "idle",
         handler: (event: { latLng: KakaoLatLng }) => void
       ): void;

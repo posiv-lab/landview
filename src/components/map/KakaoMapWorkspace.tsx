@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Database,
+  Info,
   Layers3,
   Map,
   MapPin,
@@ -40,9 +41,79 @@ type MultiPolygonGeometry = {
 type ParcelFeatureCollection = {
   type: "FeatureCollection";
   features: Array<{
+    id?: string;
     geometry: PolygonGeometry | MultiPolygonGeometry | null;
+    properties?: {
+      addr?: unknown;
+      bonbun?: unknown;
+      bubun?: unknown;
+      gosi_month?: unknown;
+      gosi_year?: unknown;
+      jibun?: unknown;
+      jiga?: unknown;
+      pnu?: unknown;
+    };
   }>;
 };
+
+type SelectedParcel = {
+  address: string;
+  bonbun: string;
+  bubun: string;
+  jibun: string;
+  officialPrice: number | null;
+  pnu: string;
+  referenceMonth: string;
+  referenceYear: string;
+};
+
+type ParcelPolygonEntry = {
+  clickHandler: (event: { latLng: KakaoLatLng }) => void;
+  polygon: KakaoPolygon;
+};
+
+const DEFAULT_PARCEL_STYLE = {
+  strokeWeight: 2,
+  strokeColor: "#d54300",
+  strokeOpacity: 0.9,
+  fillColor: "#f66336",
+  fillOpacity: 0.12
+};
+
+const SELECTED_PARCEL_STYLE = {
+  strokeWeight: 4,
+  strokeColor: "#93250a",
+  strokeOpacity: 1,
+  fillColor: "#ff540f",
+  fillOpacity: 0.38
+};
+
+function textValue(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return "";
+}
+
+function normalizeParcel(properties: ParcelFeatureCollection["features"][number]["properties"]) {
+  const price = Number(textValue(properties?.jiga));
+
+  return {
+    address: textValue(properties?.addr),
+    bonbun: textValue(properties?.bonbun),
+    bubun: textValue(properties?.bubun),
+    jibun: textValue(properties?.jibun),
+    officialPrice: Number.isFinite(price) && price > 0 ? price : null,
+    pnu: textValue(properties?.pnu),
+    referenceMonth: textValue(properties?.gosi_month),
+    referenceYear: textValue(properties?.gosi_year)
+  } satisfies SelectedParcel;
+}
 
 let kakaoMapsLoader: Promise<KakaoMapsNamespace> | null = null;
 
@@ -110,7 +181,8 @@ export function KakaoMapWorkspace({
   const markerRef = useRef<KakaoMarker | null>(null);
   const placesRef = useRef<KakaoPlaces | null>(null);
   const geocoderRef = useRef<KakaoGeocoder | null>(null);
-  const parcelPolygonsRef = useRef<KakaoPolygon[]>([]);
+  const parcelPolygonsRef = useRef<ParcelPolygonEntry[]>([]);
+  const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
   const parcelRequestRef = useRef<AbortController | null>(null);
   const parcelLayerEnabledRef = useRef(false);
   const refreshParcelsRef = useRef<() => void>(() => undefined);
@@ -123,6 +195,7 @@ export function KakaoMapWorkspace({
   const [parcelLayerEnabled, setParcelLayerEnabled] = useState(false);
   const [parcelStatus, setParcelStatus] = useState<ParcelStatus>("idle");
   const [parcelCount, setParcelCount] = useState(0);
+  const [selectedParcel, setSelectedParcel] = useState<SelectedParcel | null>(null);
 
   function moveMarker(position: KakaoLatLng) {
     const maps = mapsApiRef.current;
@@ -140,10 +213,25 @@ export function KakaoMapWorkspace({
     markerRef.current = new maps.Marker({ map, position });
   }
 
+  const clearSelectedParcel = useCallback(() => {
+    selectedParcelPolygonsRef.current.forEach((polygon) => {
+      polygon.setOptions(DEFAULT_PARCEL_STYLE);
+    });
+    selectedParcelPolygonsRef.current = [];
+    setSelectedParcel(null);
+  }, []);
+
   const clearParcelPolygons = useCallback(() => {
-    parcelPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+    const maps = mapsApiRef.current;
+
+    parcelPolygonsRef.current.forEach(({ clickHandler, polygon }) => {
+      maps?.event.removeListener(polygon, "click", clickHandler);
+      polygon.setMap(null);
+    });
     parcelPolygonsRef.current = [];
+    selectedParcelPolygonsRef.current = [];
     setParcelCount(0);
+    setSelectedParcel(null);
   }, []);
 
   const refreshParcels = useCallback(async () => {
@@ -199,11 +287,15 @@ export function KakaoMapWorkspace({
 
       clearParcelPolygons();
 
+      let renderedParcelCount = 0;
+
       featureCollection.features.forEach((feature) => {
         if (!feature.geometry) {
           return;
         }
 
+        const parcel = normalizeParcel(feature.properties);
+        const featurePolygons: KakaoPolygon[] = [];
         const polygons =
           feature.geometry.type === "Polygon"
             ? [feature.geometry.coordinates]
@@ -227,22 +319,47 @@ export function KakaoMapWorkspace({
             return;
           }
 
-          parcelPolygonsRef.current.push(
+          featurePolygons.push(
             new maps.Polygon({
               map,
               path: paths.length === 1 ? paths[0] : paths,
-              strokeWeight: 2,
-              strokeColor: "#d54300",
-              strokeOpacity: 0.9,
               strokeStyle: "solid",
-              fillColor: "#f66336",
-              fillOpacity: 0.12
+              ...DEFAULT_PARCEL_STYLE
             })
           );
         });
+
+        if (featurePolygons.length === 0) {
+          return;
+        }
+
+        renderedParcelCount += 1;
+
+        const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+          selectedParcelPolygonsRef.current.forEach((polygon) => {
+            polygon.setOptions(DEFAULT_PARCEL_STYLE);
+          });
+          featurePolygons.forEach((polygon) => {
+            polygon.setOptions(SELECTED_PARCEL_STYLE);
+          });
+
+          selectedParcelPolygonsRef.current = featurePolygons;
+          setSelectedParcel(parcel);
+          setSelectedAddress(parcel.address || parcel.jibun || "선택한 필지");
+          setSelectedCoordinates(
+            `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
+          );
+          setSearchMessage("필지를 선택했습니다.");
+          moveMarker(latLng);
+        };
+
+        featurePolygons.forEach((polygon) => {
+          maps.event.addListener(polygon, "click", clickHandler);
+          parcelPolygonsRef.current.push({ clickHandler, polygon });
+        });
       });
 
-      setParcelCount(parcelPolygonsRef.current.length);
+      setParcelCount(renderedParcelCount);
       setParcelStatus("ready");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -288,6 +405,7 @@ export function KakaoMapWorkspace({
         geocoderRef.current = new maps.services.Geocoder();
 
         clickHandler = ({ latLng }) => {
+          clearSelectedParcel();
           moveMarker(latLng);
           setSelectedCoordinates(
             `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
@@ -345,11 +463,15 @@ export function KakaoMapWorkspace({
       }
 
       parcelRequestRef.current?.abort();
-      parcelPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      parcelPolygonsRef.current.forEach(({ clickHandler: polygonClickHandler, polygon }) => {
+        mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
+        polygon.setMap(null);
+      });
       parcelPolygonsRef.current = [];
+      selectedParcelPolygonsRef.current = [];
       markerRef.current?.setMap(null);
     };
-  }, [appKey]);
+  }, [appKey, clearSelectedParcel]);
 
   function handleParcelLayerToggle() {
     const nextEnabled = !parcelLayerEnabled;
@@ -379,6 +501,7 @@ export function KakaoMapWorkspace({
     }
 
     setSearchMessage("검색 중입니다.");
+    clearSelectedParcel();
 
     places.keywordSearch(trimmedQuery, (result, status) => {
       if (status !== maps.services.Status.OK || !result[0]) {
@@ -466,6 +589,60 @@ export function KakaoMapWorkspace({
             </div>
           </section>
 
+          {selectedParcel ? (
+            <section className="parcel-detail" aria-live="polite">
+              <div className="parcel-detail__header">
+                <div>
+                  <span>선택 필지</span>
+                  <h2>{selectedParcel.address || selectedParcel.jibun || "필지 정보"}</h2>
+                </div>
+                <span className="parcel-detail__source">VWorld</span>
+              </div>
+
+              <dl className="parcel-detail__list">
+                <div>
+                  <dt>지번</dt>
+                  <dd>{selectedParcel.jibun || "-"}</dd>
+                </div>
+                <div>
+                  <dt>본번 / 부번</dt>
+                  <dd>
+                    {selectedParcel.bonbun || "-"} / {selectedParcel.bubun || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>PNU</dt>
+                  <dd className="parcel-detail__pnu">{selectedParcel.pnu || "-"}</dd>
+                </div>
+                <div>
+                  <dt>개별공시지가</dt>
+                  <dd>
+                    {selectedParcel.officialPrice
+                      ? `${selectedParcel.officialPrice.toLocaleString("ko-KR")}원/㎡`
+                      : "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>가격 기준</dt>
+                  <dd>
+                    {selectedParcel.referenceYear
+                      ? `${selectedParcel.referenceYear}년${
+                          selectedParcel.referenceMonth
+                            ? ` ${Number(selectedParcel.referenceMonth)}월`
+                            : ""
+                        }`
+                      : "-"}
+                  </dd>
+                </div>
+              </dl>
+
+              <p className="parcel-detail__notice">
+                <Info aria-hidden="true" size={15} />
+                연속지적도와 공시지가는 참고용이며 법적 효력이 없습니다.
+              </p>
+            </section>
+          ) : null}
+
           {searchMessage ? (
             <p className="map-search-message" role="status">
               {searchMessage}
@@ -507,7 +684,7 @@ export function KakaoMapWorkspace({
           </div>
 
           <p className="map-sidebar__notice">
-            현재는 기본 지도와 위치 선택 기능을 먼저 연결한 단계입니다.
+            다음 단계에서 PNU를 기준으로 실거래가와 용도지역 정보를 연결합니다.
           </p>
         </aside>
 
@@ -541,7 +718,10 @@ export function KakaoMapWorkspace({
             </div>
           ) : null}
 
-          <div className="map-source-badge">지도 © Kakao</div>
+          <div className="map-source-badge">
+            {parcelLayerEnabled ? "필지 © VWorld · " : ""}
+            지도 © Kakao
+          </div>
         </section>
       </main>
     </div>

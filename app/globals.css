@@ -1258,6 +1258,100 @@ button:disabled {
   line-height: 1.45;
 }
 
+.parcel-detail {
+  display: grid;
+  gap: var(--space-400);
+  margin-top: var(--space-400);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-400);
+  background: var(--surface-canvas);
+  padding: var(--space-400);
+}
+
+.parcel-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-300);
+}
+
+.parcel-detail__header > div {
+  display: grid;
+  gap: var(--space-100);
+  min-width: 0;
+}
+
+.parcel-detail__header span {
+  color: var(--text-caption);
+  font-size: var(--size-200);
+}
+
+.parcel-detail__header h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: var(--size-400);
+  line-height: 1.4;
+}
+
+.parcel-detail__source {
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--brand-tint-50);
+  padding: var(--space-100) var(--space-250);
+  color: var(--brand-strong-fg) !important;
+  font-weight: var(--weight-bold);
+}
+
+.parcel-detail__list {
+  display: grid;
+  margin: 0;
+}
+
+.parcel-detail__list > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: var(--space-300);
+  border-top: 1px solid var(--border-default);
+  padding: var(--space-250) 0;
+}
+
+.parcel-detail__list dt,
+.parcel-detail__list dd {
+  margin: 0;
+  font-size: var(--size-200);
+  line-height: 1.5;
+}
+
+.parcel-detail__list dt {
+  color: var(--text-caption);
+}
+
+.parcel-detail__list dd {
+  color: var(--text-heading);
+  font-weight: var(--weight-bold);
+  text-align: right;
+}
+
+.parcel-detail__pnu {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.parcel-detail__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-150);
+  margin: 0;
+  color: var(--text-caption);
+  font-size: var(--size-200);
+  line-height: 1.5;
+}
+
+.parcel-detail__notice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
 .map-search-message {
   margin: var(--space-300) 0 0;
   color: var(--text-body-long);
@@ -1595,7 +1689,7 @@ button:disabled {
     bottom: var(--space-300);
     left: var(--space-300);
     z-index: 10;
-    max-height: 42%;
+    max-height: 62%;
     border: 1px solid var(--border-default);
     border-radius: var(--radius-500);
     padding: var(--space-400);
@@ -1610,10 +1704,13 @@ button:disabled {
     font-size: var(--size-500);
   }
 
-  .map-layer-preview,
   .map-coming-soon,
   .map-sidebar__notice {
     display: none;
+  }
+
+  .map-layer-preview {
+    margin-top: var(--space-400);
   }
 
   .map-canvas {
