@@ -68,6 +68,18 @@ type SelectedParcel = {
   referenceYear: string;
 };
 
+type LandLedger = {
+  areaSquareMeters: number;
+  landCategory: string;
+  lastUpdatedDate: string;
+  legalDistrict: string;
+  lotNumber: string;
+  pnu: string;
+  registerType: string;
+};
+
+type LandLedgerStatus = "idle" | "loading" | "ready" | "not-found" | "error";
+
 type ParcelPolygonEntry = {
   clickHandler: (event: { latLng: KakaoLatLng }) => void;
   polygon: KakaoPolygon;
@@ -176,6 +188,10 @@ function formatArea(value: number) {
   );
 }
 
+function formatAreaWithPyeong(value: number) {
+  return `${formatArea(value)}㎡ (${formatArea(value / SQUARE_METERS_PER_PYEONG)}평)`;
+}
+
 function normalizeParcel(
   properties: ParcelFeatureCollection["features"][number]["properties"],
   geometry: PolygonGeometry | MultiPolygonGeometry | null
@@ -266,6 +282,7 @@ export function KakaoMapWorkspace({
   const parcelPolygonsRef = useRef<ParcelPolygonEntry[]>([]);
   const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
   const parcelRequestRef = useRef<AbortController | null>(null);
+  const landLedgerRequestRef = useRef<AbortController | null>(null);
   const parcelLayerEnabledRef = useRef(false);
   const parcelClickGuardRef = useRef(false);
   const refreshParcelsRef = useRef<() => void>(() => undefined);
@@ -279,6 +296,9 @@ export function KakaoMapWorkspace({
   const [parcelStatus, setParcelStatus] = useState<ParcelStatus>("idle");
   const [parcelCount, setParcelCount] = useState(0);
   const [selectedParcel, setSelectedParcel] = useState<SelectedParcel | null>(null);
+  const [landLedger, setLandLedger] = useState<LandLedger | null>(null);
+  const [landLedgerStatus, setLandLedgerStatus] =
+    useState<LandLedgerStatus>("idle");
 
   function moveMarker(position: KakaoLatLng) {
     const maps = mapsApiRef.current;
@@ -297,16 +317,20 @@ export function KakaoMapWorkspace({
   }
 
   const clearSelectedParcel = useCallback(() => {
+    landLedgerRequestRef.current?.abort();
     selectedParcelPolygonsRef.current.forEach((polygon) => {
       polygon.setOptions(DEFAULT_PARCEL_STYLE);
     });
     selectedParcelPolygonsRef.current = [];
     setSelectedParcel(null);
+    setLandLedger(null);
+    setLandLedgerStatus("idle");
   }, []);
 
   const clearParcelPolygons = useCallback(() => {
     const maps = mapsApiRef.current;
 
+    landLedgerRequestRef.current?.abort();
     parcelPolygonsRef.current.forEach(({ clickHandler, polygon }) => {
       maps?.event.removeListener(polygon, "click", clickHandler);
       polygon.setMap(null);
@@ -315,6 +339,59 @@ export function KakaoMapWorkspace({
     selectedParcelPolygonsRef.current = [];
     setParcelCount(0);
     setSelectedParcel(null);
+    setLandLedger(null);
+    setLandLedgerStatus("idle");
+  }, []);
+
+  const loadLandLedger = useCallback(async (pnu: string) => {
+    landLedgerRequestRef.current?.abort();
+    setLandLedger(null);
+
+    if (!/^\d{19}$/.test(pnu)) {
+      setLandLedgerStatus("not-found");
+      return;
+    }
+
+    const controller = new AbortController();
+    landLedgerRequestRef.current = controller;
+    setLandLedgerStatus("loading");
+
+    try {
+      const response = await fetch(
+        `/api/vworld/land-ledger?pnu=${encodeURIComponent(pnu)}`,
+        {
+          signal: controller.signal
+        }
+      );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      if (response.status === 404) {
+        setLandLedgerStatus("not-found");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("토지대장 정보를 불러오지 못했습니다.");
+      }
+
+      const ledger = (await response.json()) as LandLedger;
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setLandLedger(ledger);
+      setLandLedgerStatus("ready");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      setLandLedgerStatus("error");
+    }
   }, []);
 
   const refreshParcels = useCallback(async () => {
@@ -431,6 +508,7 @@ export function KakaoMapWorkspace({
 
           selectedParcelPolygonsRef.current = featurePolygons;
           setSelectedParcel(parcel);
+          void loadLandLedger(parcel.pnu);
           setSelectedAddress(parcel.address || parcel.jibun || "선택한 필지");
           setSelectedCoordinates(
             `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
@@ -459,7 +537,7 @@ export function KakaoMapWorkspace({
       clearParcelPolygons();
       setParcelStatus("error");
     }
-  }, [clearParcelPolygons, vworldConfigured]);
+  }, [clearParcelPolygons, loadLandLedger, vworldConfigured]);
 
   useEffect(() => {
     refreshParcelsRef.current = () => {
@@ -568,6 +646,7 @@ export function KakaoMapWorkspace({
       }
 
       parcelRequestRef.current?.abort();
+      landLedgerRequestRef.current?.abort();
       parcelPolygonsRef.current.forEach(({ clickHandler: polygonClickHandler, polygon }) => {
         mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
         polygon.setMap(null);
@@ -696,7 +775,12 @@ export function KakaoMapWorkspace({
           </section>
 
           {selectedParcel ? (
-            <section className="parcel-detail" aria-live="polite" ref={parcelDetailRef}>
+            <section
+              aria-busy={landLedgerStatus === "loading"}
+              aria-live="polite"
+              className="parcel-detail"
+              ref={parcelDetailRef}
+            >
               <div className="parcel-detail__header">
                 <div>
                   <span>선택 필지</span>
@@ -729,12 +813,40 @@ export function KakaoMapWorkspace({
                   </dd>
                 </div>
                 <div>
+                  <dt>토지대장 면적</dt>
+                  <dd>
+                    {landLedgerStatus === "loading"
+                      ? "조회 중..."
+                      : landLedger
+                        ? formatAreaWithPyeong(landLedger.areaSquareMeters)
+                        : landLedgerStatus === "not-found"
+                          ? "대장 정보 없음"
+                          : landLedgerStatus === "error"
+                            ? "조회 실패"
+                            : "-"}
+                  </dd>
+                </div>
+                {landLedger ? (
+                  <>
+                    <div>
+                      <dt>지목</dt>
+                      <dd>{landLedger.landCategory || "-"}</dd>
+                    </div>
+                    <div>
+                      <dt>대장 구분</dt>
+                      <dd>{landLedger.registerType || "-"}</dd>
+                    </div>
+                    <div>
+                      <dt>대장 갱신일</dt>
+                      <dd>{landLedger.lastUpdatedDate || "-"}</dd>
+                    </div>
+                  </>
+                ) : null}
+                <div>
                   <dt>경계 추정 면적</dt>
                   <dd>
                     {selectedParcel.areaSquareMeters
-                      ? `${formatArea(selectedParcel.areaSquareMeters)}㎡ (${formatArea(
-                          selectedParcel.areaSquareMeters / SQUARE_METERS_PER_PYEONG
-                        )}평)`
+                      ? formatAreaWithPyeong(selectedParcel.areaSquareMeters)
                       : "-"}
                   </dd>
                 </div>
@@ -754,8 +866,8 @@ export function KakaoMapWorkspace({
 
               <p className="parcel-detail__notice">
                 <Info aria-hidden="true" size={15} />
-                면적은 경계 좌표로 계산한 추정치입니다. 토지대장 면적과 다를 수 있으며,
-                연속지적도와 공시지가는 법적 효력이 없습니다.
+                토지대장 면적은 VWorld 토지·임야 속성정보 기준입니다. 증명용 자료는
+                발급된 토지대장을 확인하고, 경계 추정 면적은 참고용으로 사용해 주세요.
               </p>
             </section>
           ) : null}
