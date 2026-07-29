@@ -58,6 +58,7 @@ type ParcelFeatureCollection = {
 
 type SelectedParcel = {
   address: string;
+  areaSquareMeters: number | null;
   bonbun: string;
   bubun: string;
   jibun: string;
@@ -73,11 +74,11 @@ type ParcelPolygonEntry = {
 };
 
 const DEFAULT_PARCEL_STYLE = {
-  strokeWeight: 2,
-  strokeColor: "#d54300",
-  strokeOpacity: 0.9,
-  fillColor: "#f66336",
-  fillOpacity: 0.12
+  strokeWeight: 1,
+  strokeColor: "#e4c64d",
+  strokeOpacity: 0.72,
+  fillColor: "#ffe99a",
+  fillOpacity: 0.16
 };
 
 const SELECTED_PARCEL_STYLE = {
@@ -100,11 +101,91 @@ function textValue(value: unknown) {
   return "";
 }
 
-function normalizeParcel(properties: ParcelFeatureCollection["features"][number]["properties"]) {
+const EARTH_RADIUS_METERS = 6_378_137;
+const SQUARE_METERS_PER_PYEONG = 3.305785;
+
+function ringAreaSquareMeters(ring: number[][]) {
+  const coordinates = ring.filter(
+    (coordinate) =>
+      coordinate.length >= 2 &&
+      Number.isFinite(coordinate[0]) &&
+      Number.isFinite(coordinate[1])
+  );
+
+  if (coordinates.length < 3) {
+    return 0;
+  }
+
+  const referenceLatitude =
+    (coordinates.reduce((sum, coordinate) => sum + coordinate[1], 0) /
+      coordinates.length) *
+    (Math.PI / 180);
+  const [originLongitude, originLatitude] = coordinates[0];
+  const longitudeScale = EARTH_RADIUS_METERS * Math.cos(referenceLatitude);
+  const latitudeScale = EARTH_RADIUS_METERS;
+  let area = 0;
+
+  coordinates.forEach((coordinate, index) => {
+    const nextCoordinate = coordinates[(index + 1) % coordinates.length];
+    const x = (coordinate[0] - originLongitude) * (Math.PI / 180) * longitudeScale;
+    const y = (coordinate[1] - originLatitude) * (Math.PI / 180) * latitudeScale;
+    const nextX =
+      (nextCoordinate[0] - originLongitude) * (Math.PI / 180) * longitudeScale;
+    const nextY =
+      (nextCoordinate[1] - originLatitude) * (Math.PI / 180) * latitudeScale;
+
+    area += x * nextY - nextX * y;
+  });
+
+  return Math.abs(area / 2);
+}
+
+function polygonAreaSquareMeters(coordinates: number[][][]) {
+  if (coordinates.length === 0) {
+    return 0;
+  }
+
+  const outerArea = ringAreaSquareMeters(coordinates[0]);
+  const holeArea = coordinates
+    .slice(1)
+    .reduce((sum, ring) => sum + ringAreaSquareMeters(ring), 0);
+
+  return Math.max(0, outerArea - holeArea);
+}
+
+function geometryAreaSquareMeters(
+  geometry: PolygonGeometry | MultiPolygonGeometry | null
+) {
+  if (!geometry) {
+    return 0;
+  }
+
+  if (geometry.type === "Polygon") {
+    return polygonAreaSquareMeters(geometry.coordinates);
+  }
+
+  return geometry.coordinates.reduce(
+    (sum, polygon) => sum + polygonAreaSquareMeters(polygon),
+    0
+  );
+}
+
+function formatArea(value: number) {
+  return (value >= 100 ? Math.round(value) : Math.round(value * 10) / 10).toLocaleString(
+    "ko-KR"
+  );
+}
+
+function normalizeParcel(
+  properties: ParcelFeatureCollection["features"][number]["properties"],
+  geometry: PolygonGeometry | MultiPolygonGeometry | null
+) {
   const price = Number(textValue(properties?.jiga));
+  const areaSquareMeters = geometryAreaSquareMeters(geometry);
 
   return {
     address: textValue(properties?.addr),
+    areaSquareMeters: areaSquareMeters > 0 ? areaSquareMeters : null,
     bonbun: textValue(properties?.bonbun),
     bubun: textValue(properties?.bubun),
     jibun: textValue(properties?.jibun),
@@ -296,7 +377,7 @@ export function KakaoMapWorkspace({
           return;
         }
 
-        const parcel = normalizeParcel(feature.properties);
+        const parcel = normalizeParcel(feature.properties, feature.geometry);
         const featurePolygons: KakaoPolygon[] = [];
         const polygons =
           feature.geometry.type === "Polygon"
@@ -648,6 +729,16 @@ export function KakaoMapWorkspace({
                   </dd>
                 </div>
                 <div>
+                  <dt>경계 추정 면적</dt>
+                  <dd>
+                    {selectedParcel.areaSquareMeters
+                      ? `${formatArea(selectedParcel.areaSquareMeters)}㎡ (${formatArea(
+                          selectedParcel.areaSquareMeters / SQUARE_METERS_PER_PYEONG
+                        )}평)`
+                      : "-"}
+                  </dd>
+                </div>
+                <div>
                   <dt>가격 기준</dt>
                   <dd>
                     {selectedParcel.referenceYear
@@ -663,7 +754,8 @@ export function KakaoMapWorkspace({
 
               <p className="parcel-detail__notice">
                 <Info aria-hidden="true" size={15} />
-                연속지적도와 공시지가는 참고용이며 법적 효력이 없습니다.
+                면적은 경계 좌표로 계산한 추정치입니다. 토지대장 면적과 다를 수 있으며,
+                연속지적도와 공시지가는 법적 효력이 없습니다.
               </p>
             </section>
           ) : null}
