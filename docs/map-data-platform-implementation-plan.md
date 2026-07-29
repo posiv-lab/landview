@@ -256,7 +256,7 @@ flowchart LR
     U --> B[Next.js BFF/API]
     M --> K[Kakao Maps SDK]
     B --> C[(Redis 캐시)]
-    B --> D[(PostgreSQL + PostGIS)]
+    B --> D[(Supabase PostgreSQL + PostGIS)]
     B --> T[GeoJSON/벡터 타일 서비스]
 
     W[배치·동기화 워커] --> D
@@ -270,7 +270,8 @@ flowchart LR
 
 ### 구성 요소
 
-- **PostgreSQL + PostGIS**: PNU 중심 데이터와 공간 검색
+- **Supabase PostgreSQL + PostGIS**: PNU 중심 데이터, 공간 검색, 자체 회원·세션·후기 저장
+- **회원·후기 서버 계층**: Supabase Auth와 RLS 없이 Next.js 서버가 인증·인가를 수행한다. 세부 설계는 [회원가입·로그인·후기 구현 계획](./auth-review-implementation-plan.md)을 따른다.
 - **동기화 작업**: 국토부·온비드·개발정보를 정기적으로 수집하고 변경 이력을 반영
 - **Redis**: 동일 지도 영역 반복 조회 캐시와 외부 API 호출량 보호
 - **원본 저장소**: S3 또는 R2에 수집 원본과 체크섬 보관
@@ -444,12 +445,22 @@ DATABASE_URL=
 REDIS_URL=
 OBJECT_STORAGE_BUCKET=
 
+# Supabase 회원·세션·후기 — 서버 전용
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+APP_URL=http://localhost:3000
+AUTH_PASSWORD_PEPPER=
+AUTH_SESSION_TTL_DAYS=14
+AUTH_EMAIL_FROM=
+
 # 법원 연계 또는 계약형 공급자 확정 이후
 COURT_AUCTION_PROVIDER_API_KEY=
 ```
 
 - `NEXT_PUBLIC_` 접두사가 붙은 값은 브라우저에 공개된다고 가정하고 도메인을 제한한다.
 - 공공데이터·온비드·DB 키는 서버와 워커에서만 사용한다.
+- Supabase Auth와 브라우저용 Supabase 클라이언트는 사용하지 않는다. `SUPABASE_SECRET_KEY`는 Next.js 서버 전용이며 클라이언트 번들에 포함하면 안 된다.
+- 회원·세션·후기 테이블은 RLS를 사용하지 않는다. 대신 `anon`, `authenticated` 역할의 테이블 권한을 회수하고 서버의 `service_role` 접근만 허용한다.
 - 온비드가 공공데이터포털 공통 키를 쓰더라도 코드에서는 별도 이름으로 추상화해 공급자 교체에 대비할 수 있다.
 - `.env.example`에는 변수명만 적고 실제 키를 커밋하지 않는다.
 
@@ -561,12 +572,18 @@ COURT_AUCTION_PROVIDER_API_KEY=
 
 ### 6단계 — 사용자 기능과 앱 확장 (2~4주)
 
-- 로그인, 관심 필지·지역, 저장 검색
+- 자체 `users` 테이블 기반 회원가입·이메일 인증·로그인
+- Supabase Auth와 RLS를 사용하지 않는 DB 세션·서버 인가
+- 로그인 사용자 후기 작성·수정·삭제와 공개 후기 목록
+- 메인 홈의 평균 평점·후기 수·최신 공개 후기 3개
+- 관심 필지·지역, 저장 검색
 - 이메일·푸시 알림 설정
 - 필지 비교와 공유 링크
 - 설치형 PWA 우선 적용
 - 사용성과 리텐션이 검증되면 React Native 또는 Flutter 앱 검토
 - 모바일 앱도 동일한 Landview API와 내부 DTO 사용
+
+회원·세션·후기 테이블, 서버 API, 쿠키, 권한 회수, 보안 테스트의 상세 기준은 [회원가입·로그인·후기 구현 계획](./auth-review-implementation-plan.md)에 정의한다.
 
 ## 11. 테스트 계획
 

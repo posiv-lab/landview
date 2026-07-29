@@ -2,7 +2,8 @@ export const navLinks = [
   { href: "#features", label: "주요 기능" },
   { href: "#data", label: "데이터 출처" },
   { href: "#use-cases", label: "활용 사례" },
-  { href: "#faq", label: "FAQ" }
+  { href: "#faq", label: "FAQ" },
+  { href: "#reviews", label: "후기" }
 ];
 
 export const problemCards = [
@@ -164,6 +165,7 @@ export const comparisonRows = [
 ];
 
 export const footerLinks = [
+  { href: "/reviews", label: "사용자 후기" },
   { href: "/privacy", label: "개인정보처리방침" },
   { href: "/terms", label: "이용약관" },
   { href: "/info-disclaimer", label: "정보 이용 유의사항" },

@@ -9,8 +9,11 @@ import { FlowSection } from "@/components/sections/FlowSection";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { InfoChecklistSection } from "@/components/sections/InfoChecklistSection";
 import { ProblemSection } from "@/components/sections/ProblemSection";
+import { ReviewSection } from "@/components/sections/ReviewSection";
 import { SolutionSection } from "@/components/sections/SolutionSection";
 import { UseCaseSection } from "@/components/sections/UseCaseSection";
+
+export const revalidate = 60;
 
 export default function Home() {
   return (
@@ -26,6 +29,7 @@ export default function Home() {
         <FlowSection />
         <UseCaseSection />
         <FaqSection />
+        <ReviewSection />
         <FinalCtaSection />
       </main>
       <Footer />
