@@ -21,7 +21,7 @@ export function MapMockup() {
         <div className="mock-panel__head">
           <div>
             <p>선택 지역 예시</p>
-            <h3>경기 양평군 서종면</h3>
+            <strong className="mock-panel__title">경기 양평군 서종면</strong>
           </div>
           <MapPin aria-hidden="true" color="var(--brand)" size={20} />
         </div>
@@ -42,7 +42,9 @@ export function MapMockup() {
         <div className="mock-panel__head">
           <div>
             <p>필지 요약 예시</p>
-            <h3>계획관리지역 · 답 · 1,286㎡</h3>
+            <strong className="mock-panel__title">
+              계획관리지역 · 답 · 1,286㎡
+            </strong>
           </div>
           <Layers aria-hidden="true" color="var(--info-fg)" size={20} />
         </div>

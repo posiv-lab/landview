@@ -530,14 +530,15 @@ button:disabled {
   gap: var(--space-300);
 }
 
-.mock-panel h3,
 .mock-panel p {
   margin: 0;
 }
 
-.mock-panel h3 {
+.mock-panel__title {
+  display: block;
   color: var(--text-heading);
   font-size: var(--size-500);
+  font-weight: var(--weight-bold);
   line-height: 1.35;
 }
 
