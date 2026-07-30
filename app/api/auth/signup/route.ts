@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/request-security";
 import { createOpaqueToken, hashMetadata, hashToken } from "@/lib/auth/tokens";
 import { signupSchema } from "@/lib/validation/auth";
+import { getMemberServiceSetupMessage } from "@/lib/supabase/configuration-error";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("회원가입 요청 제한 확인 실패", error);
-    return jsonError("회원 서비스 설정을 확인해주세요.", 503);
+    return jsonError(getMemberServiceSetupMessage(error), 503);
   }
   if (!rateLimit.allowed) {
     return jsonError("잠시 후 다시 시도해주세요.", 429, {

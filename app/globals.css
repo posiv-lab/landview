@@ -1622,6 +1622,14 @@ button:disabled {
   color: var(--brand-strong-fg);
 }
 
+.map-toolbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-200);
+  white-space: nowrap;
+}
+
 .map-search {
   display: grid;
   min-height: 46px;
@@ -2072,7 +2080,7 @@ button:disabled {
   }
 
   .map-toolbar {
-    grid-template-columns: auto minmax(260px, 1fr);
+    grid-template-columns: auto minmax(220px, 1fr) auto;
   }
 
   .map-toolbar__back {
@@ -2217,8 +2225,8 @@ button:disabled {
   }
 
   .map-toolbar {
-    min-height: 124px;
-    grid-template-columns: 1fr;
+    min-height: 132px;
+    grid-template-columns: auto 1fr;
     gap: var(--space-300);
     padding: var(--space-300);
   }
@@ -2227,13 +2235,24 @@ button:disabled {
     justify-self: start;
   }
 
+  .map-toolbar__actions {
+    justify-self: end;
+  }
+
+  .map-toolbar__actions .button {
+    min-height: 38px;
+    padding-right: var(--space-300);
+    padding-left: var(--space-300);
+  }
+
   .map-search {
     width: 100%;
+    grid-column: 1 / -1;
   }
 
   .map-workspace {
     position: relative;
-    height: calc(100dvh - 124px);
+    height: calc(100dvh - 132px);
     min-height: 600px;
     grid-template-columns: 1fr;
   }

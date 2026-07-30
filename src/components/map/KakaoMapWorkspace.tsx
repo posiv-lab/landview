@@ -13,9 +13,12 @@ import {
   TriangleAlert
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { LogoutButton } from "@/components/auth/LogoutButton";
+import { Button } from "@/components/ui/Button";
 
 type KakaoMapWorkspaceProps = {
   appKey: string;
+  currentUser: { nickname: string } | null;
   vworldConfigured: boolean;
 };
 
@@ -270,6 +273,7 @@ function loadKakaoMaps(appKey: string) {
 
 export function KakaoMapWorkspace({
   appKey,
+  currentUser,
   vworldConfigured
 }: KakaoMapWorkspaceProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -749,10 +753,29 @@ export function KakaoMapWorkspace({
           </button>
         </form>
 
-        <Link className="map-toolbar__back" href="/">
-          <ArrowLeft aria-hidden="true" size={17} />
-          소개 페이지
-        </Link>
+        <div className="map-toolbar__actions">
+          <Link className="map-toolbar__back" href="/">
+            <ArrowLeft aria-hidden="true" size={17} />
+            소개
+          </Link>
+          {currentUser ? (
+            <>
+              <Button href="/account" size="sm" variant="secondary">
+                {currentUser.nickname}님
+              </Button>
+              <LogoutButton />
+            </>
+          ) : (
+            <>
+              <Button href="/login?next=/map" size="sm" variant="ghost">
+                로그인
+              </Button>
+              <Button href="/signup" size="sm">
+                회원가입
+              </Button>
+            </>
+          )}
+        </div>
       </header>
 
       <main className="map-workspace">

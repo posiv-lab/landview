@@ -11,6 +11,7 @@ import {
 import { createUserSession } from "@/lib/auth/session";
 import { hashMetadata } from "@/lib/auth/tokens";
 import { loginSchema } from "@/lib/validation/auth";
+import { getMemberServiceSetupMessage } from "@/lib/supabase/configuration-error";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("로그인 요청 제한 확인 실패", error);
-    return jsonError("회원 서비스 설정을 확인해주세요.", 503);
+    return jsonError(getMemberServiceSetupMessage(error), 503);
   }
   if (!rateLimit.allowed) {
     return jsonError("로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", 429, {
