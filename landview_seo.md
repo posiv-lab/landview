@@ -19,7 +19,7 @@
 | 8 | 신뢰 정보 | 완료·보완 필요 | 데이터 출처, 캐시 기준, 현재/계획 기능 구분, 정보 이용 유의사항, 개인정보처리방침과 이용약관을 정리했다. 법적 운영자 정보는 확정 후 추가해야 한다. |
 | 9 | 내부 링크·구조화 데이터 | 완료 | 푸터에 후기·데이터 출처·정책 페이지 링크를 연결하고 홈페이지에 Organization, WebSite, WebApplication JSON-LD를 추가했다. |
 | 10 | 검색·공유 이미지 | 완료 | SVG 파비콘, 웹 앱 manifest, 1200×630 Open Graph 이미지를 추가했다. |
-| 11 | Core Web Vitals | 1차 검증 완료 | 프로덕션 빌드와 린트를 통과했다. 실제 사용자 지표는 Search Console/Speed Insights 데이터가 쌓인 뒤 관리한다. |
+| 11 | Core Web Vitals | 1차 검증 완료 | 외부 폰트 CDN을 제거하고 프로덕션 Lighthouse를 측정했다. 실제 사용자 지표는 Search Console/Speed Insights 데이터가 쌓인 뒤 관리한다. |
 
 ## 2. 현재 검색 공개 URL
 
@@ -115,6 +115,21 @@
 확정되지 않은 주소, 전화번호, 법적 상호는 검색 노출을 위해 임의로 만들지 않는다.
 
 ## 7. 성과 측정 기준
+
+2026-07-30 Chrome Lighthouse 모바일 실험실 측정 결과는 다음과 같다. 네트워크와 서버 상태에 따라 점수는 달라질 수 있으며 실제 사용자 Core Web Vitals와는 구분해야 한다.
+
+| 항목 | 결과 |
+| --- | ---: |
+| Performance | 88 |
+| Accessibility | 100 |
+| Best Practices | 100 |
+| SEO | 100 |
+| FCP | 2.0초 |
+| LCP | 2.3초 |
+| CLS | 0 |
+| TBT | 180ms |
+
+첫 화면 글자 렌더링을 지연시키던 외부 Pretendard CDN 의존성을 제거했다. LCP와 CLS는 실험실 기준 양호 범위지만, Performance 점수는 측정 환경에 따라 변동하므로 실제 사용자 데이터가 수집되면 다시 판단한다.
 
 검색엔진 등록 후 매월 다음 항목을 확인한다.
 
