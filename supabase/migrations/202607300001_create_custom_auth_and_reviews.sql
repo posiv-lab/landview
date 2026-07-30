@@ -162,7 +162,7 @@ create table public.reviews (
   constraint reviews_content_check
     check (
       content = btrim(content)
-      and char_length(content) between 20 and 2000
+      and char_length(content) between 5 and 999
     ),
   constraint reviews_status_check
     check (status in ('published', 'hidden', 'deleted')),

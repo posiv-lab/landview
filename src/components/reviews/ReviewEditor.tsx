@@ -124,14 +124,14 @@ export function ReviewEditor({
           내용
           <textarea
             defaultValue={review?.content ?? ""}
-            maxLength={2000}
-            minLength={20}
+            maxLength={999}
+            minLength={5}
             name="content"
             placeholder="LandView를 사용하며 좋았던 점이나 개선이 필요한 점을 알려주세요."
             required
             rows={7}
           />
-          <small>20자 이상 2,000자 이하</small>
+          <small>5자 이상 1,000자 미만</small>
         </label>
         {message ? (
           <p

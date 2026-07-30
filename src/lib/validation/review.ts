@@ -6,8 +6,8 @@ export const reviewInputSchema = z.object({
   content: z
     .string()
     .trim()
-    .min(20, "후기는 20자 이상 입력해주세요.")
-    .max(2000, "후기는 2,000자 이하여야 합니다."),
+    .min(5, "후기는 5자 이상 입력해주세요.")
+    .max(999, "후기는 1,000자 미만으로 입력해주세요."),
 });
 
 export const reviewIdSchema = z.string().uuid();
