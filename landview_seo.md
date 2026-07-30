@@ -10,7 +10,7 @@
 | 순위 | 항목 | 상태 | 처리 내용 |
 | --- | --- | --- | --- |
 | 1 | 대표 도메인 통일 | 완료 | 모든 canonical과 메타데이터 기준을 `https://landview.vercel.app`으로 통일했다. |
-| 2 | 구 도메인 중복 제거 | 완료 | `https://ddangview.vercel.app`의 루트와 모든 하위 경로를 새 도메인으로 308 영구 리디렉션한다. |
+| 2 | 구 도메인 중복 제거 | 완료 | 2026-07-30 Vercel의 `ddangview` 프로젝트와 전체 배포를 삭제했다. 기존 주소는 `404 DEPLOYMENT_NOT_FOUND`를 반환한다. |
 | 3 | robots.txt·sitemap.xml | 완료 | 검색 허용 범위와 공개 URL 목록을 Next.js Metadata Route로 생성했다. |
 | 4 | 검색엔진 등록 | 사용자 확인 필요 | Google·Naver의 사이트 소유권 확인은 계정 로그인이 필요하다. 코드에는 환경변수 기반 확인 태그 지원을 넣었다. |
 | 5 | 회원·인증 페이지 색인 방지 | 완료 | 로그인, 회원가입, 계정, 이메일 인증, 비밀번호 재설정 페이지에 `noindex, nofollow`를 적용했다. |
