@@ -13,6 +13,7 @@ export function getMemberServiceSetupMessage(error: unknown) {
     if (
       code === "PGRST202" ||
       code === "42883" ||
+      code === "42804" ||
       message.includes("consume_auth_rate_limit")
     ) {
       return "Supabase SQL Editor에서 회원 기능 마이그레이션을 실행해주세요.";
