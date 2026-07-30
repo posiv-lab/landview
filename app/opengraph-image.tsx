@@ -23,7 +23,7 @@ export default function OpenGraphImage() {
           width: "100%",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", width: 735 }}>
+        <div style={{ display: "flex", flexDirection: "column", width: 690 }}>
           <div
             style={{
               alignItems: "center",
@@ -39,16 +39,16 @@ export default function OpenGraphImage() {
           <div
             style={{
               display: "flex",
-              fontSize: 76,
+              flexDirection: "column",
+              fontSize: 66,
               fontWeight: 800,
-              letterSpacing: -4,
-              lineHeight: 1.18,
+              letterSpacing: -3,
+              lineHeight: 1.16,
               marginTop: 24,
             }}
           >
-            토지 정보를
-            <br />
-            지도에서 한눈에
+            <div style={{ display: "flex" }}>토지 정보를</div>
+            <div style={{ display: "flex" }}>지도에서 한눈에</div>
           </div>
           <div
             style={{
@@ -69,10 +69,11 @@ export default function OpenGraphImage() {
             boxShadow: "0 28px 70px rgba(124, 45, 18, 0.22)",
             color: "white",
             display: "flex",
-            fontSize: 92,
+            fontSize: 72,
             fontWeight: 800,
             height: 280,
             justifyContent: "center",
+            whiteSpace: "nowrap",
             width: 280,
           }}
         >
