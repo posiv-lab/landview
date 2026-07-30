@@ -65,7 +65,7 @@ export function PublicReviewList({
         <div className="review-empty">
           <Star aria-hidden="true" size={28} />
           <h2>첫 후기를 기다리고 있습니다.</h2>
-          <p>LandView를 사용한 경험을 가장 먼저 들려주세요.</p>
+          <p>땅뷰를 사용한 경험을 가장 먼저 들려주세요.</p>
         </div>
       )}
       {pageCount > 1 ? (

@@ -127,7 +127,7 @@ export function ReviewEditor({
             maxLength={999}
             minLength={5}
             name="content"
-            placeholder="LandView를 사용하며 좋았던 점이나 개선이 필요한 점을 알려주세요."
+            placeholder="땅뷰를 사용하며 좋았던 점이나 개선이 필요한 점을 알려주세요."
             required
             rows={7}
           />

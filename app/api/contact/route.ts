@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   try {
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: "Landview 문의 <onboarding@resend.dev>",
+      from: "땅뷰 문의 <onboarding@resend.dev>",
       to: recipients,
       replyTo: isEmail(contact) ? contact : undefined,
       subject: email.subject,

@@ -166,8 +166,8 @@ export const comparisonRows = [
 
 export const footerLinks = [
   { href: "/reviews", label: "사용자 후기" },
+  { href: "/data-sources", label: "데이터 출처" },
   { href: "/privacy", label: "개인정보처리방침" },
   { href: "/terms", label: "이용약관" },
-  { href: "/info-disclaimer", label: "정보 이용 유의사항" },
-  { href: "mailto:hello@ddangview.com", label: "문의" }
+  { href: "/info-disclaimer", label: "정보 이용 유의사항" }
 ];

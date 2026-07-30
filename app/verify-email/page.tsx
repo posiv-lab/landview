@@ -1,7 +1,8 @@
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { VerifyEmailForm } from "@/components/auth/AuthForms";
+import { createPrivateMetadata } from "@/lib/seo";
 
-export const metadata = { title: "이메일 인증 | LandView" };
+export const metadata = createPrivateMetadata("이메일 인증");
 
 export default async function VerifyEmailPage({
   searchParams,

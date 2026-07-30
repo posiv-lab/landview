@@ -1,7 +1,8 @@
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { ResetPasswordForm } from "@/components/auth/AuthForms";
+import { createPrivateMetadata } from "@/lib/seo";
 
-export const metadata = { title: "비밀번호 재설정 | LandView" };
+export const metadata = createPrivateMetadata("비밀번호 재설정");
 
 export default async function ResetPasswordPage({
   searchParams,

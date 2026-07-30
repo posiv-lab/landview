@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import { ContactDialogProvider } from "@/components/contact/ContactDialog";
+import {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://ddangview.com"),
-  title: "땅뷰 | 지역별 토지 실거래가·공시지가·규제 정보를 한 화면에서",
-  description:
-    "관심 지역의 토지 실거래가, 공시지가, 용도지역, 규제 정보를 땅뷰 한곳에서 확인하세요. 여러 사이트에 흩어진 땅 정보를 지역별로 정리해 보여드립니다.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "땅뷰 | 필지 경계·토지대장 면적을 지도에서 한눈에",
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  category: "real estate",
   keywords: [
     "토지 실거래가 조회",
     "땅값 조회",
@@ -18,13 +27,40 @@ export const metadata: Metadata = {
     "농지 가격"
   ],
   openGraph: {
-    title: "땅뷰 | 지역별 토지 정보를 한 화면에서",
-    description:
-      "실거래가, 공시지가, 용도지역, 규제 정보를 지역별로 정리해 보여주는 토지 정보 조회 서비스.",
+    title: "땅뷰 | 필지 경계·토지대장 면적을 지도에서 한눈에",
+    description: SITE_DESCRIPTION,
     type: "website",
     locale: "ko_KR",
-    siteName: "땅뷰"
-  }
+    siteName: SITE_NAME,
+    url: "/",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "땅뷰 토지 정보 지도 서비스",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "땅뷰 | 필지 경계·토지대장 면적을 지도에서 한눈에",
+    description: SITE_DESCRIPTION,
+    images: ["/opengraph-image"],
+  },
+  icons: {
+    icon: "/icon.svg",
+  },
+  manifest: "/manifest.webmanifest",
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined,
+    other: process.env.NAVER_SITE_VERIFICATION?.trim()
+      ? {
+          "naver-site-verification":
+            process.env.NAVER_SITE_VERIFICATION.trim(),
+        }
+      : undefined,
+  },
 };
 
 export default function RootLayout({

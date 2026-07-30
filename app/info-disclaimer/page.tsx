@@ -1,9 +1,13 @@
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
+import { createPublicMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "정보 이용 유의사항 | 땅뷰"
-};
+export const metadata = createPublicMetadata({
+  title: "정보 이용 유의사항",
+  description:
+    "땅뷰에서 제공하는 지도·필지·토지대장 정보의 한계와 중요한 의사결정 전 확인사항을 안내합니다.",
+  path: "/info-disclaimer",
+});
 
 export default function InfoDisclaimerPage() {
   return (

@@ -131,7 +131,7 @@ export async function getPublicReviewPage(page = 1, pageSize = 12) {
     reviews: (reviewsResult.data ?? []).map((review) => ({
       id: String(review.id),
       rating: Number(review.rating),
-      title: review.title ? String(review.title) : "LandView 사용 후기",
+      title: review.title ? String(review.title) : "땅뷰 사용 후기",
       content: String(review.content),
       nickname: String(review.nickname),
       createdAt: String(review.created_at),

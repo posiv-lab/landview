@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { LoginForm } from "@/components/auth/AuthForms";
 import { getCurrentUser } from "@/lib/auth/session";
+import { createPrivateMetadata } from "@/lib/seo";
 
-export const metadata = { title: "로그인 | LandView" };
+export const metadata = createPrivateMetadata("로그인");
 
 export default async function LoginPage({
   searchParams,
@@ -18,7 +19,7 @@ export default async function LoginPage({
 
   return (
     <AuthPageShell
-      description="LandView 계정으로 로그인하고 후기와 저장 기능을 이용해보세요."
+      description="땅뷰 계정으로 로그인하고 후기와 저장 기능을 이용해보세요."
       eyebrow="LANDVIEW ACCOUNT"
       title="로그인"
     >

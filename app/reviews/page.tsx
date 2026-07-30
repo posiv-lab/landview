@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { PublicReviewList } from "@/components/reviews/PublicReviewList";
@@ -7,8 +9,14 @@ import {
   getUserReview,
 } from "@/data-access/reviews";
 import { getCurrentUser } from "@/lib/auth/session";
+import { createPublicMetadata } from "@/lib/seo";
 
-export const metadata = { title: "사용자 후기 | LandView" };
+export const metadata: Metadata = createPublicMetadata({
+  title: "사용자 후기",
+  description:
+    "땅뷰를 사용한 회원들의 실제 후기를 확인하고, 로그인 후 직접 사용 경험을 남겨보세요.",
+  path: "/reviews",
+});
 export const revalidate = 60;
 
 export default async function ReviewsPage({
@@ -39,7 +47,7 @@ export default async function ReviewsPage({
             <p className="eyebrow">LANDVIEW REVIEWS</p>
             <h1>사용자 후기</h1>
             <p>
-              LandView를 사용한 회원들의 실제 경험을 확인하고 의견을
+              땅뷰를 사용한 회원들의 실제 경험을 확인하고 의견을
               남겨보세요.
             </p>
           </div>

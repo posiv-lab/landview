@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">땅뷰</title>
+  <rect width="512" height="512" rx="112" fill="#c2410c"/>
+  <path d="M112 123c0-15 12-27 27-27h234c15 0 27 12 27 27v266c0 15-12 27-27 27H139c-15 0-27-12-27-27V123Z" fill="#fff7ed"/>
+  <path d="M177 96v320M335 96v320M112 226h288M112 334h288" fill="none" stroke="#c2410c" stroke-width="20"/>
+  <circle cx="256" cy="256" r="59" fill="#c2410c"/>
+  <path d="M256 176c-44 0-80 35-80 79 0 57 80 137 80 137s80-80 80-137c0-44-36-79-80-79Zm0 111a34 34 0 1 1 0-68 34 34 0 0 1 0 68Z" fill="#7c2d12"/>
+</svg>

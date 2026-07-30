@@ -25,14 +25,14 @@
 
 1. Resend → Domains에서 소유한 도메인을 인증한다.
 2. 인증된 도메인의 발신 주소를 정한다.
-   - 예: `LandView <account@landview.example>`
+   - 예: `땅뷰 <account@landview.example>`
 3. 이 값을 아래 `AUTH_EMAIL_FROM`에 사용한다.
 
 `onboarding@resend.dev`는 일반 운영 사용자 전체에게 보내는 발신 주소로 사용하지 않는다.
 
 ## 3. Vercel 환경변수 입력
 
-Vercel → LandView 프로젝트 → Settings → Environment Variables에 다음 값을 입력한다.
+Vercel → `landview` 프로젝트 → Settings → Environment Variables에 다음 값을 입력한다.
 
 ```dotenv
 SUPABASE_URL=https://프로젝트-참조.supabase.co
@@ -40,7 +40,7 @@ SUPABASE_SECRET_KEY=Supabase의_서버용_secret_key
 APP_URL=https://landview.vercel.app
 AUTH_PASSWORD_PEPPER=32바이트_이상의_무작위_문자열
 AUTH_SESSION_TTL_DAYS=14
-AUTH_EMAIL_FROM=LandView <account@인증한도메인>
+AUTH_EMAIL_FROM=땅뷰 <account@인증한도메인>
 RESEND_API_KEY=Resend_API_Key
 ```
 

@@ -6,8 +6,9 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Button } from "@/components/ui/Button";
 import { getUserReview } from "@/data-access/reviews";
 import { getCurrentUser } from "@/lib/auth/session";
+import { createPrivateMetadata } from "@/lib/seo";
 
-export const metadata = { title: "내 계정 | LandView" };
+export const metadata = createPrivateMetadata("내 계정");
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
@@ -44,8 +45,8 @@ export default async function AccountPage() {
             <h2>{review ? "작성한 후기가 있습니다." : "아직 작성한 후기가 없습니다."}</h2>
             <p>
               {review
-                ? `별점 ${review.rating}점 · ${review.title ?? "LandView 사용 후기"}`
-                : "LandView 사용 경험을 다른 사용자와 공유해보세요."}
+                ? `별점 ${review.rating}점 · ${review.title ?? "땅뷰 사용 후기"}`
+                : "땅뷰 사용 경험을 다른 사용자와 공유해보세요."}
             </p>
             <Button href="/reviews#write-review">
               {review ? "후기 수정하기" : "후기 작성하기"}

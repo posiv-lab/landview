@@ -1,27 +1,27 @@
-# Landview 회원가입·로그인·후기 구현 계획
+# 땅뷰 회원가입·로그인·후기 구현 계획
 
 - 작성일: 2026-07-30
 - 대상: Next.js App Router + Vercel + Supabase PostgreSQL
-- 인증 방식: Landview 자체 `users` 테이블과 데이터베이스 세션
+- 인증 방식: 땅뷰 자체 `users` 테이블과 데이터베이스 세션
 - 제외 범위: Supabase Auth, `auth.users`, Supabase 세션/JWT, RLS
 
 ## 1. 확정 결정
 
 1. 회원 원장은 Supabase PostgreSQL의 `public.users` 테이블이다.
 2. PostgreSQL 예약어와 혼동되는 단수형 `user` 대신 `users`를 테이블명으로 사용한다.
-3. 비밀번호 검증, 세션 생성, 로그인 상태 확인, 후기 작성 권한 검사는 모두 Landview 서버에서 수행한다.
+3. 비밀번호 검증, 세션 생성, 로그인 상태 확인, 후기 작성 권한 검사는 모두 땅뷰 서버에서 수행한다.
 4. 브라우저는 Supabase를 직접 호출하지 않고 Next.js Route Handler 또는 Server Action만 호출한다.
 5. Supabase Auth API와 `auth.users`는 사용하지 않는다.
 6. RLS 정책은 만들지 않으며 관련 테이블의 RLS를 명시적으로 비활성화한다.
 7. RLS를 대신해 `anon`·`authenticated` 역할의 테이블 권한을 회수하고 서버 비밀 키를 사용하는 `service_role`만 접근시킨다.
 8. 후기 조회는 비회원도 가능하지만 생성·수정·삭제는 로그인한 사용자만 가능하다.
-9. 첫 출시의 후기는 Landview 서비스 후기로 시작하고, `target_type`과 `target_key`를 두어 향후 필지(PNU) 후기 등으로 확장한다.
+9. 첫 출시의 후기는 땅뷰 서비스 후기로 시작하고, `target_type`과 `target_key`를 두어 향후 필지(PNU) 후기 등으로 확장한다.
 
 ## 2. 요청 흐름과 보안 경계
 
 ```mermaid
 flowchart LR
-    B[브라우저] -->|HTTPS·Landview 세션 쿠키| N[Next.js 서버]
+    B[브라우저] -->|HTTPS·땅뷰 세션 쿠키| N[Next.js 서버]
     N -->|서버 전용 Supabase secret key| S[(Supabase PostgreSQL)]
     N -->|인증·재설정 이메일| R[Resend]
 
@@ -199,7 +199,7 @@ Vercel의 여러 서버 인스턴스가 동일한 요청 제한 상태를 사용
 - `review_public_summary`: 대상별 공개 후기 수와 평균 평점을 제공한다.
 - 두 뷰 모두 `published` 후기와 `active` 사용자만 포함한다.
 - 이메일, 사용자 ID, 비밀번호 해시, 계정 상태, 세션 정보는 공개 뷰에 포함하지 않는다.
-- 브라우저가 뷰를 직접 조회하지 않고 Landview 서버가 `service_role`로 읽어 DTO를 반환한다.
+- 브라우저가 뷰를 직접 조회하지 않고 땅뷰 서버가 `service_role`로 읽어 DTO를 반환한다.
 
 ## 5. 회원 인증 흐름
 

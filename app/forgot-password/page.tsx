@@ -1,7 +1,8 @@
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { ForgotPasswordForm } from "@/components/auth/AuthForms";
+import { createPrivateMetadata } from "@/lib/seo";
 
-export const metadata = { title: "비밀번호 찾기 | LandView" };
+export const metadata = createPrivateMetadata("비밀번호 찾기");
 
 export default function ForgotPasswordPage() {
   return (

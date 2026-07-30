@@ -43,7 +43,7 @@ export function createContactEmail(data: ContactEmailData) {
   }).format(new Date());
 
   return {
-    subject: `[Landview 문의] ${inquiryType} - ${data.name.replace(/[\r\n]+/g, " ")}`,
+    subject: `[땅뷰 문의] ${inquiryType} - ${data.name.replace(/[\r\n]+/g, " ")}`,
     html: `
       <!doctype html>
       <html lang="ko">
@@ -73,7 +73,7 @@ export function createContactEmail(data: ContactEmailData) {
       </html>
     `,
     text: [
-      "[Landview] 새로운 문의가 접수되었습니다.",
+      "[땅뷰] 새로운 문의가 접수되었습니다.",
       `문의 유형: ${inquiryType}`,
       `이름: ${data.name}`,
       `연락처: ${data.contact}`,

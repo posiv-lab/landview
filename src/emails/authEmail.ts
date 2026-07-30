@@ -16,8 +16,8 @@ export function createAuthEmail(input: {
 }) {
   const isVerification = input.purpose === "verify";
   const title = isVerification
-    ? "LandView 이메일 인증을 완료해주세요"
-    : "LandView 비밀번호를 재설정해주세요";
+    ? "땅뷰 이메일 인증을 완료해주세요"
+    : "땅뷰 비밀번호를 재설정해주세요";
   const description = isVerification
     ? "아래 버튼을 눌러 회원가입을 완료할 수 있습니다."
     : "본인이 요청한 경우에만 아래 버튼을 눌러 새 비밀번호를 설정해주세요.";

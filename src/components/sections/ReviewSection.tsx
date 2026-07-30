@@ -44,7 +44,7 @@ export async function ReviewSection() {
               <Badge variant="neutral">사용자 후기</Badge>
             </div>
             <h2 className="section-title">
-              LandView를 먼저 경험한 분들의 이야기
+              땅뷰를 먼저 경험한 분들의 이야기
             </h2>
             <p className="section-description">
               후기는 로그인한 회원만 작성할 수 있으며, 공개 상태인 후기만
@@ -91,7 +91,7 @@ export async function ReviewSection() {
                 : "후기 기능을 준비하고 있습니다."}
             </h3>
             <p>
-              회원 기능이 연결되면 로그인 후 LandView 사용 경험을 남길 수
+              회원 기능이 연결되면 로그인 후 땅뷰 사용 경험을 남길 수
               있습니다.
             </p>
           </div>
