@@ -110,6 +110,7 @@ type PlanningZoneDetail = {
   classification: string;
   districtCode: string;
   noticeId: string;
+  programTags?: string[];
   projectName: string;
   projectType: string;
   regionName: string;
@@ -301,6 +302,48 @@ function textValue(value: unknown) {
 
 const EARTH_RADIUS_METERS = 6_378_137;
 const SQUARE_METERS_PER_PYEONG = 3.305785;
+
+const PROGRAM_TAG_LABELS: Record<string, string> = {
+  fast_track_planning: "신속통합기획",
+  moa_town: "모아타운",
+  public_led: "공공시행",
+  public_reconstruction: "공공재건축",
+  public_redevelopment: "공공재개발",
+  renewal_promotion_district: "재정비촉진지구",
+  station_area: "역세권"
+};
+
+function programTagLabels(tags: string[] | undefined) {
+  return (tags ?? []).map((tag) => PROGRAM_TAG_LABELS[tag] ?? tag);
+}
+
+const OFFICIAL_POLICY_SOURCES = [
+  {
+    name: "신속통합기획",
+    summary: "309개 대상지 · 2026년 6월 기준",
+    url: "https://news.seoul.go.kr/citybuild/plan-progress"
+  },
+  {
+    name: "모아타운",
+    summary: "132개 관리지역 · 2026년 3월 말 기준",
+    url: "https://news.seoul.go.kr/citybuild/moa-housing-town/policy/status"
+  },
+  {
+    name: "도심 공공주택 복합지구",
+    summary: "수도권 지정지구 14개 경계 지도 연결",
+    url: "https://www.data.go.kr/data/15160356/fileData.do"
+  },
+  {
+    name: "서울플랜+ 통합 공간자료",
+    summary: "신속통합·모아타운 포함 원본 공간자료",
+    url: "https://data.seoul.go.kr/dataList/OA-22712/F/1/datasetView.do"
+  },
+  {
+    name: "경기도 정비사업 온누리",
+    summary: "경기도 시·군별 정비사업 공식 포털",
+    url: "https://www.gg.go.kr/onnuri/"
+  }
+] as const;
 
 function ringAreaSquareMeters(ring: number[][]) {
   const coordinates = ring.filter(
@@ -1293,6 +1336,7 @@ export function KakaoMapWorkspace({
             classification: `${project.sourceProvider} 정비사업 추진현황`,
             districtCode: project.regionCode,
             noticeId: "",
+            programTags: project.programTags ?? [],
             projectName: project.projectName,
             projectType: project.projectType,
             regionName: `${regionName} ${project.districtName}`.trim(),
@@ -1655,6 +1699,14 @@ export function KakaoMapWorkspace({
     "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
     error: "정비·개발계획 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<PlanningStatus, string>;
+  const selectedProgramLabels = selectedPlanningZone
+    ? programTagLabels([
+        ...new Set([
+          ...(selectedPlanningZone.programTags ?? []),
+          ...(maintenanceProjectDetail?.programTags ?? [])
+        ])
+      ])
+    : [];
 
   return (
     <div className="map-page">
@@ -1743,6 +1795,14 @@ export function KakaoMapWorkspace({
                   {selectedPlanningZone.projectType}
                 </span>
               </div>
+
+              {selectedProgramLabels.length > 0 ? (
+                <div aria-label="정책·사업 태그" className="project-program-tags">
+                  {selectedProgramLabels.map((label) => (
+                    <span key={label}>{label}</span>
+                  ))}
+                </div>
+              ) : null}
 
               <dl className="parcel-detail__list">
                 <div>
@@ -2282,6 +2342,27 @@ export function KakaoMapWorkspace({
             {planningStatusMessage[planningStatus]}
           </p>
 
+          <section aria-labelledby="official-policy-title" className="official-policy-sources">
+            <div className="official-policy-sources__heading">
+              <Database aria-hidden="true" size={17} />
+              <h2 id="official-policy-title">정책사업 공식 현황</h2>
+            </div>
+            <div className="official-policy-sources__list">
+              {OFFICIAL_POLICY_SOURCES.map((source) => (
+                <a href={source.url} key={source.name} rel="noreferrer" target="_blank">
+                  <strong>{source.name}</strong>
+                  <span>{source.summary}</span>
+                  <small>공식 원문 보기 ↗</small>
+                </a>
+              ))}
+            </div>
+            <p>
+              신속통합기획·모아타운 원문은 공공누리 제4유형입니다. 무료 공개
+              서비스에서도 형식 변경이 금지되어 원문 링크로 제공하며, 지도에는
+              변경 가능한 공식 API·파일만 표시합니다.
+            </p>
+          </section>
+
           <div className="map-coming-soon">
             <div>
               <Database aria-hidden="true" size={17} />
@@ -2294,8 +2375,8 @@ export function KakaoMapWorkspace({
           </div>
 
           <p className="map-sidebar__notice">
-            신속통합기획·모아타운·도심공공복합사업은 공식 이용조건을 확인한
-            데이터부터 순차적으로 추가합니다.
+            후보지와 법정 지정구역은 성격이 다릅니다. 계약·투자 판단 전에는
+            반드시 관할 기관의 최신 고시를 확인해 주세요.
           </p>
         </aside>
 

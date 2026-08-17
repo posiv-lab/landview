@@ -1830,6 +1830,22 @@ button:disabled {
   color: #075985 !important;
 }
 
+.project-program-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-150);
+}
+
+.project-program-tags span {
+  border: 1px solid color-mix(in srgb, #b45309 26%, var(--border-default));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, #fffbeb 82%, var(--surface-canvas));
+  padding: var(--space-100) var(--space-250);
+  color: #92400e;
+  font-size: var(--size-100);
+  font-weight: var(--weight-bold);
+}
+
 .maintenance-official {
   display: grid;
   gap: var(--space-250);
@@ -1848,7 +1864,7 @@ button:disabled {
 
 .maintenance-official__heading strong {
   color: var(--text-heading);
-  font-size: var(--size-250);
+  font-size: var(--size-200);
 }
 
 .maintenance-official__heading span,
@@ -2055,6 +2071,67 @@ button:disabled {
 
 .map-layer-message--ready {
   color: var(--success-strong);
+}
+
+.official-policy-sources {
+  display: grid;
+  gap: var(--space-300);
+  margin-top: var(--space-500);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-300);
+  background: var(--surface-subtle);
+  padding: var(--space-350);
+}
+
+.official-policy-sources__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-200);
+  color: var(--text-heading);
+}
+
+.official-policy-sources__heading h2 {
+  margin: 0;
+  font-size: var(--size-300);
+}
+
+.official-policy-sources__list {
+  display: grid;
+  gap: var(--space-200);
+}
+
+.official-policy-sources__list a {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-200);
+  background: var(--surface-canvas);
+  padding: var(--space-250) var(--space-300);
+  color: inherit;
+  text-decoration: none;
+}
+
+.official-policy-sources__list a:hover {
+  border-color: var(--brand-subtle-border);
+}
+
+.official-policy-sources__list strong {
+  color: var(--text-heading);
+  font-size: var(--size-200);
+}
+
+.official-policy-sources__list span,
+.official-policy-sources__list small,
+.official-policy-sources > p {
+  margin: 0;
+  color: var(--text-caption);
+  font-size: var(--size-100);
+  line-height: 1.45;
+}
+
+.official-policy-sources__list small {
+  color: var(--brand-strong-fg);
+  font-weight: var(--weight-bold);
 }
 
 .map-coming-soon {

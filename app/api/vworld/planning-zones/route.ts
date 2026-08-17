@@ -34,6 +34,7 @@ type SafeFeature = {
     classification: string;
     districtCode: string;
     noticeId: string;
+    programTags: string[];
     projectName: string;
     projectType: string;
     regionName: string;
@@ -58,6 +59,31 @@ function textValue(value: unknown) {
 function numberValue(value: unknown) {
   const number = Number(textValue(value).replaceAll(",", ""));
   return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function programTags(projectName: string) {
+  const tags: string[] = [];
+
+  if (projectName.includes("공공재개발")) {
+    tags.push("public_redevelopment");
+  }
+  if (projectName.includes("공공재건축")) {
+    tags.push("public_reconstruction");
+  }
+  if (projectName.includes("재정비촉진")) {
+    tags.push("renewal_promotion_district");
+  }
+  if (projectName.includes("신속통합")) {
+    tags.push("fast_track_planning");
+  }
+  if (projectName.includes("모아타운")) {
+    tags.push("moa_town");
+  }
+  if (projectName.includes("역세권")) {
+    tags.push("station_area");
+  }
+
+  return tags;
 }
 
 function parseBbox(value: string | null) {
@@ -222,6 +248,7 @@ export async function GET(request: NextRequest) {
           classification,
           districtCode: textValue(properties.signgu_se),
           noticeId: textValue(properties.ntfc_sn) || textValue(properties.wtnnc_sn),
+          programTags: programTags(projectName),
           projectName,
           projectType: categoryConfig[category].label,
           regionName: textValue(properties.sig_nam),

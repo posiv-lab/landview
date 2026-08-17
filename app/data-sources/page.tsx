@@ -58,6 +58,18 @@ const connectedSources = [
     link: "https://data.seoul.go.kr/dataList/OA-22856/S/1/datasetView.do",
   },
   {
+    name: "서울특별시 신속통합기획 추진현황",
+    purpose:
+      "2026년 6월 기준 대상지 309개와 추진단계 집계를 공식 원문 링크로 확인",
+    link: "https://news.seoul.go.kr/citybuild/plan-progress",
+  },
+  {
+    name: "서울특별시 모아타운 추진현황",
+    purpose:
+      "2026년 3월 말 기준 관리지역 132개와 세부 추진현황을 공식 원문 링크로 확인",
+    link: "https://news.seoul.go.kr/citybuild/moa-housing-town/policy/status",
+  },
+  {
     name: "국토교통부 VWorld 주소검색",
     purpose:
       "서울·인천 정비사업 원본 위치를 지도에서 탐색할 수 있도록 대표 좌표 확인",
@@ -70,9 +82,22 @@ const plannedSources = [
   "토지이용규제정보 및 용도지역·지구 정보",
   "온비드 공매 정보",
   "법원경매 등 이용 조건을 확인한 경매 정보",
-  "서울 신속통합기획·모아타운(상업 이용 허락 또는 개방 데이터 확보 후)",
+  "서울 신속통합기획·모아타운 상세 위치(형식 변경 허락 또는 별도 개방 데이터 확보 후)",
   "국토교통부·LH·SH·GH·iH 도심 공공주택 복합사업",
   "공공재개발·공공재건축 및 재정비촉진사업",
+];
+
+const officialReferenceSources = [
+  {
+    name: "서울플랜+ 도시계획사업 공간정보 OA-22712",
+    purpose: "신속통합기획·모아타운을 포함한 원본 공간자료 확인",
+    link: "https://data.seoul.go.kr/dataList/OA-22712/F/1/datasetView.do",
+  },
+  {
+    name: "경기도 정비사업 온누리시스템",
+    purpose: "경기도 시·군별 정비사업 공식 현황 교차확인",
+    link: "https://www.gg.go.kr/onnuri/",
+  },
 ];
 
 export default function DataSourcesPage() {
@@ -147,6 +172,27 @@ export default function DataSourcesPage() {
             위 항목은 현재 제공 중인 기능이 아니라 구현·이용 조건을 검토
             중인 범위입니다. 실제 연결 시 출처, 기준일, 갱신 주기와 제공
             한계를 이 페이지에 추가합니다.
+          </p>
+
+          <h2>공식 교차확인 창구</h2>
+          <ul>
+            {officialReferenceSources.map((source) => (
+              <li key={source.name}>
+                <a href={source.link} rel="noreferrer" target="_blank">
+                  {source.name}
+                </a>
+                : {source.purpose}
+              </li>
+            ))}
+          </ul>
+
+          <h2>비상업 이용과 변경금지 자료</h2>
+          <p>
+            땅뷰는 현재 무료·비상업 공개를 전제로 운영합니다. 다만 공공누리
+            제4유형은 비상업 이용만 허용하는 동시에 형식 변경과 2차적 저작물
+            작성을 금지합니다. 따라서 신속통합기획·모아타운 원문은 출처 링크로
+            연결하고, SHP를 GeoJSON으로 변환하는 등 지도용 가공은 별도 허락을
+            받기 전까지 진행하지 않습니다.
           </p>
 
           <h2>정보 이용 시 유의사항</h2>
