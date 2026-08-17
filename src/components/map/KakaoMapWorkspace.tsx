@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  Building2,
   Database,
   Info,
   Layers3,
@@ -24,6 +25,23 @@ type KakaoMapWorkspaceProps = {
 
 type MapStatus = "loading" | "ready" | "error" | "missing-key";
 type ParcelStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "zoom-in"
+  | "not-configured"
+  | "error";
+
+type DevelopmentStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "zoom-in"
+  | "error";
+
+type PlanningCategory = "maintenance" | "urban-development" | "housing-site";
+
+type PlanningStatus =
   | "idle"
   | "loading"
   | "ready"
@@ -59,6 +77,114 @@ type ParcelFeatureCollection = {
   }>;
 };
 
+type DevelopmentFeatureCollection = {
+  features: Array<{
+    geometry: PolygonGeometry | MultiPolygonGeometry | null;
+    id?: string;
+    properties: DevelopmentProjectDetail;
+    type: "Feature";
+  }>;
+  total: number;
+  truncated: boolean;
+  type: "FeatureCollection";
+};
+
+type DevelopmentProjectDetail = {
+  areaSquareMeters: number | null;
+  bounds: [number, number, number, number];
+  districtCode: string;
+  noticeDate: string;
+  noticeId: string;
+  projectName: string;
+  projectType: string;
+  regionName: string;
+  remark: string;
+  sourceBaseDate: string;
+  sourceFile: string;
+  sourceName: string;
+};
+
+type PlanningZoneDetail = {
+  areaSquareMeters: number | null;
+  category: PlanningCategory;
+  classification: string;
+  districtCode: string;
+  noticeId: string;
+  projectName: string;
+  projectType: string;
+  regionName: string;
+  sourceName: string;
+  statusName: string;
+};
+
+type MaintenanceProjectDetail = {
+  areaSquareMeters: number | null;
+  businessStage: string;
+  businessStageOrder: number;
+  center?: {
+    latitude: number;
+    longitude: number;
+    matchedAddress: string;
+    query: string;
+    source: string;
+  };
+  details: {
+    architecturalReviewDate?: string;
+    associationApprovalDate?: string;
+    committeeApprovalDate?: string;
+    constructionStartDate?: string;
+    districtDesignationDate?: string;
+    districtType?: string;
+    existingHouseholds?: number | null;
+    implementationApprovalDate?: string;
+    managementDispositionDate?: string;
+    memberCount?: number | null;
+    note?: string;
+    ownerCount?: number | null;
+    plannedHouseholds?: number | null;
+    plannedRentalHouseholds?: number | null;
+    plannedSaleHouseholds?: number | null;
+    publicPrivate?: string;
+    relocationEndDate?: string;
+    relocationStartDate?: string;
+    residentAgreementDate?: string;
+  };
+  districtName: string;
+  id: string;
+  location: string;
+  matchConfidence?: "exact" | "normalized";
+  officialUrl: string;
+  programTags?: string[];
+  projectName: string;
+  projectType: string;
+  rawStage: string;
+  regionCode: string;
+  sourceBaseDate: string;
+  sourceDataset: string;
+  sourceProvider: string;
+};
+
+type MaintenanceProjectCollection = {
+  projects: MaintenanceProjectDetail[];
+  total: number;
+  type: "LandViewMaintenanceProjectCollection";
+};
+
+type MaintenanceMatchStatus = "idle" | "loading" | "ready" | "not-found" | "error";
+
+type PlanningFeatureCollection = {
+  category: PlanningCategory;
+  features: Array<{
+    geometry: PolygonGeometry | MultiPolygonGeometry | null;
+    id: string;
+    properties: PlanningZoneDetail;
+    type: "Feature";
+  }>;
+  total: number;
+  truncated: boolean;
+  type: "FeatureCollection";
+};
+
 type SelectedParcel = {
   address: string;
   areaSquareMeters: number | null;
@@ -88,6 +214,15 @@ type ParcelPolygonEntry = {
   polygon: KakaoPolygon;
 };
 
+type DevelopmentPolygonEntry = ParcelPolygonEntry;
+
+type PlanningPolygonEntry = ParcelPolygonEntry;
+
+type MaintenanceMarkerEntry = {
+  clickHandler: () => void;
+  marker: KakaoMarker;
+};
+
 const DEFAULT_PARCEL_STYLE = {
   strokeWeight: 1,
   strokeColor: "#e4c64d",
@@ -102,6 +237,54 @@ const SELECTED_PARCEL_STYLE = {
   strokeOpacity: 1,
   fillColor: "#ff540f",
   fillOpacity: 0.38
+};
+
+const DEFAULT_DEVELOPMENT_STYLE = {
+  strokeWeight: 2,
+  strokeColor: "#6d28d9",
+  strokeOpacity: 0.9,
+  fillColor: "#a78bfa",
+  fillOpacity: 0.14
+};
+
+const SELECTED_DEVELOPMENT_STYLE = {
+  strokeWeight: 4,
+  strokeColor: "#4c1d95",
+  strokeOpacity: 1,
+  fillColor: "#8b5cf6",
+  fillOpacity: 0.3
+};
+
+const PLANNING_ZONE_STYLES: Record<PlanningCategory, typeof DEFAULT_DEVELOPMENT_STYLE> = {
+  maintenance: {
+    strokeWeight: 2,
+    strokeColor: "#dc2626",
+    strokeOpacity: 0.9,
+    fillColor: "#f87171",
+    fillOpacity: 0.13
+  },
+  "urban-development": {
+    strokeWeight: 2,
+    strokeColor: "#0369a1",
+    strokeOpacity: 0.9,
+    fillColor: "#38bdf8",
+    fillOpacity: 0.13
+  },
+  "housing-site": {
+    strokeWeight: 2,
+    strokeColor: "#0f766e",
+    strokeOpacity: 0.9,
+    fillColor: "#2dd4bf",
+    fillOpacity: 0.13
+  }
+};
+
+const SELECTED_PLANNING_STYLE = {
+  strokeWeight: 4,
+  strokeColor: "#111827",
+  strokeOpacity: 1,
+  fillColor: "#f59e0b",
+  fillOpacity: 0.3
 };
 
 function textValue(value: unknown) {
@@ -195,6 +378,19 @@ function formatAreaWithPyeong(value: number) {
   return `${formatArea(value)}㎡ (${formatArea(value / SQUARE_METERS_PER_PYEONG)}평)`;
 }
 
+function developmentProjectDisplayName(project: DevelopmentProjectDetail) {
+  if (
+    project.projectName.startsWith("공공주택지구 (") &&
+    project.remark.includes("도심 공공주택 복합지구")
+  ) {
+    return project.remark
+      .replace(/\s*(?:지정 및 지형도면.*|지정.*|고시.*)$/u, "")
+      .trim();
+  }
+
+  return project.projectName;
+}
+
 function normalizeParcel(
   properties: ParcelFeatureCollection["features"][number]["properties"],
   geometry: PolygonGeometry | MultiPolygonGeometry | null
@@ -278,18 +474,34 @@ export function KakaoMapWorkspace({
 }: KakaoMapWorkspaceProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const parcelDetailRef = useRef<HTMLElement>(null);
+  const developmentDetailRef = useRef<HTMLElement>(null);
+  const planningDetailRef = useRef<HTMLElement>(null);
   const mapsApiRef = useRef<KakaoMapsNamespace | null>(null);
   const mapRef = useRef<KakaoMap | null>(null);
   const markerRef = useRef<KakaoMarker | null>(null);
   const placesRef = useRef<KakaoPlaces | null>(null);
   const geocoderRef = useRef<KakaoGeocoder | null>(null);
   const parcelPolygonsRef = useRef<ParcelPolygonEntry[]>([]);
+  const developmentPolygonsRef = useRef<DevelopmentPolygonEntry[]>([]);
+  const planningPolygonsRef = useRef<PlanningPolygonEntry[]>([]);
+  const maintenanceMarkersRef = useRef<MaintenanceMarkerEntry[]>([]);
   const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
+  const selectedDevelopmentPolygonsRef = useRef<KakaoPolygon[]>([]);
+  const selectedPlanningPolygonsRef = useRef<KakaoPolygon[]>([]);
   const parcelRequestRef = useRef<AbortController | null>(null);
+  const developmentRequestRef = useRef<AbortController | null>(null);
+  const developmentDataRef = useRef<DevelopmentFeatureCollection | null>(null);
+  const planningRequestRef = useRef<AbortController | null>(null);
+  const maintenanceMatchRequestRef = useRef<AbortController | null>(null);
+  const maintenanceDataRef = useRef<MaintenanceProjectCollection | null>(null);
   const landLedgerRequestRef = useRef<AbortController | null>(null);
   const parcelLayerEnabledRef = useRef(false);
+  const developmentLayerEnabledRef = useRef(false);
+  const planningLayerEnabledRef = useRef(false);
   const parcelClickGuardRef = useRef(false);
   const refreshParcelsRef = useRef<() => void>(() => undefined);
+  const refreshDevelopmentProjectsRef = useRef<() => void>(() => undefined);
+  const refreshPlanningZonesRef = useRef<() => void>(() => undefined);
 
   const [mapStatus, setMapStatus] = useState<MapStatus>(appKey ? "loading" : "missing-key");
   const [query, setQuery] = useState("");
@@ -297,9 +509,31 @@ export function KakaoMapWorkspace({
   const [selectedAddress, setSelectedAddress] = useState("지도를 클릭하거나 주소를 검색해 보세요.");
   const [selectedCoordinates, setSelectedCoordinates] = useState("");
   const [parcelLayerEnabled, setParcelLayerEnabled] = useState(false);
+  const [developmentLayerEnabled, setDevelopmentLayerEnabled] = useState(false);
+  const [planningLayerEnabled, setPlanningLayerEnabled] = useState(false);
   const [parcelStatus, setParcelStatus] = useState<ParcelStatus>("idle");
+  const [developmentStatus, setDevelopmentStatus] =
+    useState<DevelopmentStatus>("idle");
+  const [planningStatus, setPlanningStatus] = useState<PlanningStatus>("idle");
   const [parcelCount, setParcelCount] = useState(0);
+  const [developmentCount, setDevelopmentCount] = useState(0);
+  const [developmentTruncated, setDevelopmentTruncated] = useState(false);
+  const [planningCounts, setPlanningCounts] = useState<Record<PlanningCategory, number>>({
+    maintenance: 0,
+    "urban-development": 0,
+    "housing-site": 0
+  });
+  const [planningTruncated, setPlanningTruncated] = useState(false);
+  const [maintenancePointCount, setMaintenancePointCount] = useState(0);
   const [selectedParcel, setSelectedParcel] = useState<SelectedParcel | null>(null);
+  const [selectedDevelopmentProject, setSelectedDevelopmentProject] =
+    useState<DevelopmentProjectDetail | null>(null);
+  const [selectedPlanningZone, setSelectedPlanningZone] =
+    useState<PlanningZoneDetail | null>(null);
+  const [maintenanceProjectDetail, setMaintenanceProjectDetail] =
+    useState<MaintenanceProjectDetail | null>(null);
+  const [maintenanceMatchStatus, setMaintenanceMatchStatus] =
+    useState<MaintenanceMatchStatus>("idle");
   const [landLedger, setLandLedger] = useState<LandLedger | null>(null);
   const [landLedgerStatus, setLandLedgerStatus] =
     useState<LandLedgerStatus>("idle");
@@ -345,6 +579,72 @@ export function KakaoMapWorkspace({
     setSelectedParcel(null);
     setLandLedger(null);
     setLandLedgerStatus("idle");
+  }, []);
+
+  const clearSelectedDevelopmentProject = useCallback(() => {
+    selectedDevelopmentPolygonsRef.current.forEach((polygon) => {
+      polygon.setOptions(DEFAULT_DEVELOPMENT_STYLE);
+    });
+    selectedDevelopmentPolygonsRef.current = [];
+    setSelectedDevelopmentProject(null);
+  }, []);
+
+  const clearDevelopmentPolygons = useCallback(() => {
+    const maps = mapsApiRef.current;
+
+    developmentRequestRef.current?.abort();
+    developmentPolygonsRef.current.forEach(({ clickHandler, polygon }) => {
+      maps?.event.removeListener(polygon, "click", clickHandler);
+      polygon.setMap(null);
+    });
+    developmentPolygonsRef.current = [];
+    selectedDevelopmentPolygonsRef.current = [];
+    setDevelopmentCount(0);
+    setDevelopmentTruncated(false);
+    setSelectedDevelopmentProject(null);
+  }, []);
+
+  const clearSelectedPlanningZone = useCallback(() => {
+    maintenanceMatchRequestRef.current?.abort();
+    selectedPlanningPolygonsRef.current.forEach((polygon) => {
+      const category = (polygon as KakaoPolygon & { planningCategory?: PlanningCategory })
+        .planningCategory;
+      polygon.setOptions(
+        category ? PLANNING_ZONE_STYLES[category] : PLANNING_ZONE_STYLES.maintenance
+      );
+    });
+    selectedPlanningPolygonsRef.current = [];
+    setSelectedPlanningZone(null);
+    setMaintenanceProjectDetail(null);
+    setMaintenanceMatchStatus("idle");
+  }, []);
+
+  const clearPlanningPolygons = useCallback(() => {
+    const maps = mapsApiRef.current;
+
+    planningRequestRef.current?.abort();
+    maintenanceMatchRequestRef.current?.abort();
+    planningPolygonsRef.current.forEach(({ clickHandler, polygon }) => {
+      maps?.event.removeListener(polygon, "click", clickHandler);
+      polygon.setMap(null);
+    });
+    maintenanceMarkersRef.current.forEach(({ clickHandler, marker }) => {
+      maps?.event.removeListener(marker, "click", clickHandler);
+      marker.setMap(null);
+    });
+    planningPolygonsRef.current = [];
+    maintenanceMarkersRef.current = [];
+    selectedPlanningPolygonsRef.current = [];
+    setPlanningCounts({
+      maintenance: 0,
+      "urban-development": 0,
+      "housing-site": 0
+    });
+    setPlanningTruncated(false);
+    setMaintenancePointCount(0);
+    setSelectedPlanningZone(null);
+    setMaintenanceProjectDetail(null);
+    setMaintenanceMatchStatus("idle");
   }, []);
 
   const loadLandLedger = useCallback(async (pnu: string) => {
@@ -543,11 +843,524 @@ export function KakaoMapWorkspace({
     }
   }, [clearParcelPolygons, loadLandLedger, vworldConfigured]);
 
+  const refreshDevelopmentProjects = useCallback(async () => {
+    const maps = mapsApiRef.current;
+    const map = mapRef.current;
+
+    if (!maps || !map || !developmentLayerEnabledRef.current) {
+      return;
+    }
+
+    if (map.getLevel() > 10) {
+      developmentRequestRef.current?.abort();
+      clearDevelopmentPolygons();
+      setDevelopmentStatus("zoom-in");
+      return;
+    }
+
+    developmentRequestRef.current?.abort();
+    const controller = new AbortController();
+    developmentRequestRef.current = controller;
+    setDevelopmentStatus("loading");
+
+    try {
+      let featureCollection = developmentDataRef.current;
+
+      if (!featureCollection) {
+        const response = await fetch("/data/development-projects-capital-region.geojson", {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error("개발사업 경계를 불러오지 못했습니다.");
+        }
+
+        featureCollection = (await response.json()) as DevelopmentFeatureCollection;
+        developmentDataRef.current = featureCollection;
+      }
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      clearDevelopmentPolygons();
+      let renderedProjectCount = 0;
+      const bounds = map.getBounds();
+      const southWest = bounds.getSouthWest();
+      const northEast = bounds.getNorthEast();
+      const visibleFeatures = featureCollection.features.filter((feature) => {
+        const [minLongitude, minLatitude, maxLongitude, maxLatitude] =
+          feature.properties.bounds;
+
+        return (
+          maxLongitude >= southWest.getLng() &&
+          minLongitude <= northEast.getLng() &&
+          maxLatitude >= southWest.getLat() &&
+          minLatitude <= northEast.getLat()
+        );
+      });
+
+      visibleFeatures.forEach((feature) => {
+        if (!feature.geometry || !feature.properties.projectName) {
+          return;
+        }
+
+        const featurePolygons: KakaoPolygon[] = [];
+        const polygons =
+          feature.geometry.type === "Polygon"
+            ? [feature.geometry.coordinates]
+            : feature.geometry.coordinates;
+
+        polygons.forEach((polygonCoordinates) => {
+          const paths = polygonCoordinates
+            .map((ring) =>
+              ring
+                .filter(
+                  (coordinate) =>
+                    coordinate.length >= 2 &&
+                    Number.isFinite(coordinate[0]) &&
+                    Number.isFinite(coordinate[1])
+                )
+                .map((coordinate) => new maps.LatLng(coordinate[1], coordinate[0]))
+            )
+            .filter((ring) => ring.length >= 3);
+
+          if (paths.length === 0) {
+            return;
+          }
+
+          featurePolygons.push(
+            new maps.Polygon({
+              map,
+              path: paths.length === 1 ? paths[0] : paths,
+              strokeStyle: "solid",
+              ...DEFAULT_DEVELOPMENT_STYLE
+            })
+          );
+        });
+
+        if (featurePolygons.length === 0) {
+          return;
+        }
+
+        renderedProjectCount += 1;
+
+        const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+          maps.event.preventMap();
+          parcelClickGuardRef.current = true;
+          clearSelectedParcel();
+          clearSelectedPlanningZone();
+
+          selectedDevelopmentPolygonsRef.current.forEach((polygon) => {
+            polygon.setOptions(DEFAULT_DEVELOPMENT_STYLE);
+          });
+          featurePolygons.forEach((polygon) => {
+            polygon.setOptions(SELECTED_DEVELOPMENT_STYLE);
+          });
+
+          selectedDevelopmentPolygonsRef.current = featurePolygons;
+          setSelectedDevelopmentProject(feature.properties);
+          setSelectedAddress(feature.properties.projectName);
+          setSelectedCoordinates(
+            `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
+          );
+          setSearchMessage("공공주택지구를 선택했습니다.");
+          moveMarker(latLng);
+
+          window.requestAnimationFrame(() => {
+            parcelClickGuardRef.current = false;
+          });
+        };
+
+        featurePolygons.forEach((polygon) => {
+          maps.event.addListener(polygon, "click", clickHandler);
+          developmentPolygonsRef.current.push({ clickHandler, polygon });
+        });
+      });
+
+      setDevelopmentCount(renderedProjectCount);
+      setDevelopmentTruncated(Boolean(featureCollection.truncated));
+      setDevelopmentStatus("ready");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      clearDevelopmentPolygons();
+      setDevelopmentStatus("error");
+    }
+  }, [
+    clearDevelopmentPolygons,
+    clearSelectedParcel,
+    clearSelectedPlanningZone
+  ]);
+
+  const loadMaintenanceProjectDetail = useCallback(
+    async (zone: PlanningZoneDetail) => {
+      maintenanceMatchRequestRef.current?.abort();
+      setMaintenanceProjectDetail(null);
+
+      if (zone.category !== "maintenance" || !zone.districtCode.startsWith("28")) {
+        setMaintenanceMatchStatus("idle");
+        return;
+      }
+
+      const controller = new AbortController();
+      maintenanceMatchRequestRef.current = controller;
+      setMaintenanceMatchStatus("loading");
+
+      try {
+        const response = await fetch(
+          `/api/maintenance-projects/match?name=${encodeURIComponent(
+            zone.projectName
+          )}&regionCode=28`,
+          { signal: controller.signal }
+        );
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (response.status === 404) {
+          setMaintenanceMatchStatus("not-found");
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("MAINTENANCE_PROJECT_REQUEST_FAILED");
+        }
+
+        const detail = (await response.json()) as MaintenanceProjectDetail;
+        setMaintenanceProjectDetail(detail);
+        setMaintenanceMatchStatus("ready");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setMaintenanceMatchStatus("error");
+      }
+    },
+    []
+  );
+
+  const refreshPlanningZones = useCallback(async () => {
+    const maps = mapsApiRef.current;
+    const map = mapRef.current;
+
+    if (!maps || !map || !planningLayerEnabledRef.current) {
+      return;
+    }
+
+    if (!vworldConfigured) {
+      clearPlanningPolygons();
+      setPlanningStatus("not-configured");
+      return;
+    }
+
+    if (map.getLevel() > 10) {
+      planningRequestRef.current?.abort();
+      clearPlanningPolygons();
+      setPlanningStatus("zoom-in");
+      return;
+    }
+
+    const bounds = map.getBounds();
+    const southWest = bounds.getSouthWest();
+    const northEast = bounds.getNorthEast();
+    const bbox = [
+      southWest.getLng(),
+      southWest.getLat(),
+      northEast.getLng(),
+      northEast.getLat()
+    ].join(",");
+    const categories: PlanningCategory[] = [
+      "maintenance",
+      "urban-development",
+      "housing-site"
+    ];
+
+    planningRequestRef.current?.abort();
+    const controller = new AbortController();
+    planningRequestRef.current = controller;
+    setPlanningStatus("loading");
+
+    try {
+      const [collections, maintenanceCollection] = await Promise.all([
+        Promise.all(
+          categories.map(async (category) => {
+            const response = await fetch(
+              `/api/vworld/planning-zones?bbox=${encodeURIComponent(
+                bbox
+              )}&category=${category}`,
+              { signal: controller.signal }
+            );
+
+            if (response.status === 503) {
+              throw new Error("VWORLD_NOT_CONFIGURED");
+            }
+
+            if (!response.ok) {
+              throw new Error("PLANNING_ZONES_REQUEST_FAILED");
+            }
+
+            return (await response.json()) as PlanningFeatureCollection;
+          })
+        ),
+        (async () => {
+          if (maintenanceDataRef.current) {
+            return maintenanceDataRef.current;
+          }
+
+          const responses = await Promise.all(
+            [
+              "/data/seoul-maintenance-projects.json",
+              "/data/incheon-maintenance-projects.json"
+            ].map((url) => fetch(url, { signal: controller.signal }))
+          );
+          if (responses.some((response) => !response.ok)) {
+            throw new Error("MAINTENANCE_DATA_REQUEST_FAILED");
+          }
+
+          const sourceCollections = await Promise.all(
+            responses.map(
+              async (response) =>
+                (await response.json()) as MaintenanceProjectCollection
+            )
+          );
+          const collection: MaintenanceProjectCollection = {
+            projects: sourceCollections.flatMap(({ projects }) => projects),
+            total: sourceCollections.reduce(
+              (total, sourceCollection) => total + sourceCollection.total,
+              0
+            ),
+            type: "LandViewMaintenanceProjectCollection"
+          };
+          maintenanceDataRef.current = collection;
+          return collection;
+        })()
+      ]);
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      clearPlanningPolygons();
+      const counts: Record<PlanningCategory, number> = {
+        maintenance: 0,
+        "urban-development": 0,
+        "housing-site": 0
+      };
+
+      collections.forEach((collection) => {
+        collection.features.forEach((feature) => {
+          if (!feature.geometry || !feature.properties.projectName) {
+            return;
+          }
+
+          const category = feature.properties.category;
+          const featurePolygons: KakaoPolygon[] = [];
+          const polygons =
+            feature.geometry.type === "Polygon"
+              ? [feature.geometry.coordinates]
+              : feature.geometry.coordinates;
+
+          polygons.forEach((polygonCoordinates) => {
+            const paths = polygonCoordinates
+              .map((ring) =>
+                ring
+                  .filter(
+                    (coordinate) =>
+                      coordinate.length >= 2 &&
+                      Number.isFinite(coordinate[0]) &&
+                      Number.isFinite(coordinate[1])
+                  )
+                  .map((coordinate) => new maps.LatLng(coordinate[1], coordinate[0]))
+              )
+              .filter((ring) => ring.length >= 3);
+
+            if (paths.length === 0) {
+              return;
+            }
+
+            const polygon = new maps.Polygon({
+              map,
+              path: paths.length === 1 ? paths[0] : paths,
+              strokeStyle: "solid",
+              ...PLANNING_ZONE_STYLES[category]
+            });
+            (
+              polygon as KakaoPolygon & { planningCategory?: PlanningCategory }
+            ).planningCategory = category;
+            featurePolygons.push(polygon);
+          });
+
+          if (featurePolygons.length === 0) {
+            return;
+          }
+
+          counts[category] += 1;
+
+          const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+            maps.event.preventMap();
+            parcelClickGuardRef.current = true;
+            clearSelectedParcel();
+            clearSelectedDevelopmentProject();
+
+            selectedPlanningPolygonsRef.current.forEach((polygon) => {
+              const previousCategory = (
+                polygon as KakaoPolygon & { planningCategory?: PlanningCategory }
+              ).planningCategory;
+              polygon.setOptions(
+                previousCategory
+                  ? PLANNING_ZONE_STYLES[previousCategory]
+                  : PLANNING_ZONE_STYLES.maintenance
+              );
+            });
+            featurePolygons.forEach((polygon) => {
+              polygon.setOptions(SELECTED_PLANNING_STYLE);
+            });
+
+            selectedPlanningPolygonsRef.current = featurePolygons;
+            setSelectedPlanningZone(feature.properties);
+            void loadMaintenanceProjectDetail(feature.properties);
+            setSelectedAddress(feature.properties.projectName);
+            setSelectedCoordinates(
+              `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
+            );
+            setSearchMessage(`${feature.properties.projectType}를 선택했습니다.`);
+            moveMarker(latLng);
+
+            window.requestAnimationFrame(() => {
+              parcelClickGuardRef.current = false;
+            });
+          };
+
+          featurePolygons.forEach((polygon) => {
+            maps.event.addListener(polygon, "click", clickHandler);
+            planningPolygonsRef.current.push({ clickHandler, polygon });
+          });
+        });
+      });
+
+      const visibleMaintenanceProjects = maintenanceCollection.projects.filter(
+        (project) =>
+          project.center &&
+          project.center.longitude >= southWest.getLng() &&
+          project.center.longitude <= northEast.getLng() &&
+          project.center.latitude >= southWest.getLat() &&
+          project.center.latitude <= northEast.getLat()
+      );
+
+      visibleMaintenanceProjects.forEach((project) => {
+        if (!project.center) {
+          return;
+        }
+
+        const position = new maps.LatLng(
+          project.center.latitude,
+          project.center.longitude
+        );
+        const marker = new maps.Marker({ map, position });
+        const clickHandler = () => {
+          const regionName =
+            project.regionCode === "11"
+              ? "서울특별시"
+              : project.regionCode === "28"
+                ? "인천광역시"
+                : "경기도";
+          maps.event.preventMap();
+          parcelClickGuardRef.current = true;
+          maintenanceMatchRequestRef.current?.abort();
+          clearSelectedParcel();
+          clearSelectedDevelopmentProject();
+
+          selectedPlanningPolygonsRef.current.forEach((polygon) => {
+            const previousCategory = (
+              polygon as KakaoPolygon & { planningCategory?: PlanningCategory }
+            ).planningCategory;
+            polygon.setOptions(
+              previousCategory
+                ? PLANNING_ZONE_STYLES[previousCategory]
+                : PLANNING_ZONE_STYLES.maintenance
+            );
+          });
+          selectedPlanningPolygonsRef.current = [];
+
+          setSelectedPlanningZone({
+            areaSquareMeters: project.areaSquareMeters,
+            category: "maintenance",
+            classification: `${project.sourceProvider} 정비사업 추진현황`,
+            districtCode: project.regionCode,
+            noticeId: "",
+            projectName: project.projectName,
+            projectType: project.projectType,
+            regionName: `${regionName} ${project.districtName}`.trim(),
+            sourceName: project.sourceProvider,
+            statusName: project.businessStage
+          });
+          setMaintenanceProjectDetail(project);
+          setMaintenanceMatchStatus("ready");
+          setSelectedAddress(
+            project.center?.matchedAddress ||
+              `${regionName} ${project.districtName} ${project.location}`.trim()
+          );
+          setSelectedCoordinates(
+            `${position.getLat().toFixed(6)}, ${position.getLng().toFixed(6)}`
+          );
+          setSearchMessage(`${project.projectName} 추진현황을 선택했습니다.`);
+          moveMarker(position);
+
+          window.requestAnimationFrame(() => {
+            parcelClickGuardRef.current = false;
+          });
+        };
+
+        maps.event.addListener(marker, "click", clickHandler);
+        maintenanceMarkersRef.current.push({ clickHandler, marker });
+      });
+
+      setPlanningCounts(counts);
+      setMaintenancePointCount(visibleMaintenanceProjects.length);
+      setPlanningTruncated(collections.some((collection) => collection.truncated));
+      setPlanningStatus("ready");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      clearPlanningPolygons();
+      setPlanningStatus(
+        error instanceof Error && error.message === "VWORLD_NOT_CONFIGURED"
+          ? "not-configured"
+          : "error"
+      );
+    }
+  }, [
+    clearPlanningPolygons,
+    clearSelectedDevelopmentProject,
+    clearSelectedParcel,
+    loadMaintenanceProjectDetail,
+    vworldConfigured
+  ]);
+
   useEffect(() => {
     refreshParcelsRef.current = () => {
       void refreshParcels();
     };
   }, [refreshParcels]);
+
+  useEffect(() => {
+    refreshDevelopmentProjectsRef.current = () => {
+      void refreshDevelopmentProjects();
+    };
+  }, [refreshDevelopmentProjects]);
+
+  useEffect(() => {
+    refreshPlanningZonesRef.current = () => {
+      void refreshPlanningZones();
+    };
+  }, [refreshPlanningZones]);
 
   useEffect(() => {
     if (!selectedParcel) {
@@ -559,6 +1372,28 @@ export function KakaoMapWorkspace({
       block: "nearest"
     });
   }, [selectedParcel]);
+
+  useEffect(() => {
+    if (!selectedDevelopmentProject) {
+      return;
+    }
+
+    developmentDetailRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
+  }, [selectedDevelopmentProject]);
+
+  useEffect(() => {
+    if (!selectedPlanningZone) {
+      return;
+    }
+
+    planningDetailRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
+  }, [selectedPlanningZone]);
 
   useEffect(() => {
     if (!appKey || !mapContainerRef.current) {
@@ -593,6 +1428,8 @@ export function KakaoMapWorkspace({
           }
 
           clearSelectedParcel();
+          clearSelectedDevelopmentProject();
+          clearSelectedPlanningZone();
           moveMarker(latLng);
           setSelectedCoordinates(
             `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
@@ -623,7 +1460,11 @@ export function KakaoMapWorkspace({
             clearTimeout(idleTimer);
           }
 
-          idleTimer = setTimeout(() => refreshParcelsRef.current(), 350);
+          idleTimer = setTimeout(() => {
+            refreshParcelsRef.current();
+            refreshDevelopmentProjectsRef.current();
+            refreshPlanningZonesRef.current();
+          }, 350);
         };
         maps.event.addListener(map, "idle", idleHandler);
         setMapStatus("ready");
@@ -650,6 +1491,8 @@ export function KakaoMapWorkspace({
       }
 
       parcelRequestRef.current?.abort();
+      developmentRequestRef.current?.abort();
+      planningRequestRef.current?.abort();
       landLedgerRequestRef.current?.abort();
       parcelPolygonsRef.current.forEach(({ clickHandler: polygonClickHandler, polygon }) => {
         mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
@@ -657,10 +1500,31 @@ export function KakaoMapWorkspace({
       });
       parcelPolygonsRef.current = [];
       selectedParcelPolygonsRef.current = [];
+      developmentPolygonsRef.current.forEach(
+        ({ clickHandler: polygonClickHandler, polygon }) => {
+          mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
+          polygon.setMap(null);
+        }
+      );
+      developmentPolygonsRef.current = [];
+      selectedDevelopmentPolygonsRef.current = [];
+      planningPolygonsRef.current.forEach(
+        ({ clickHandler: polygonClickHandler, polygon }) => {
+          mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
+          polygon.setMap(null);
+        }
+      );
+      planningPolygonsRef.current = [];
+      selectedPlanningPolygonsRef.current = [];
       parcelClickGuardRef.current = false;
       markerRef.current?.setMap(null);
     };
-  }, [appKey, clearSelectedParcel]);
+  }, [
+    appKey,
+    clearSelectedDevelopmentProject,
+    clearSelectedParcel,
+    clearSelectedPlanningZone
+  ]);
 
   function handleParcelLayerToggle() {
     const nextEnabled = !parcelLayerEnabled;
@@ -677,6 +1541,36 @@ export function KakaoMapWorkspace({
     void refreshParcels();
   }
 
+  function handleDevelopmentLayerToggle() {
+    const nextEnabled = !developmentLayerEnabled;
+    developmentLayerEnabledRef.current = nextEnabled;
+    setDevelopmentLayerEnabled(nextEnabled);
+
+    if (!nextEnabled) {
+      developmentRequestRef.current?.abort();
+      clearDevelopmentPolygons();
+      setDevelopmentStatus("idle");
+      return;
+    }
+
+    void refreshDevelopmentProjects();
+  }
+
+  function handlePlanningLayerToggle() {
+    const nextEnabled = !planningLayerEnabled;
+    planningLayerEnabledRef.current = nextEnabled;
+    setPlanningLayerEnabled(nextEnabled);
+
+    if (!nextEnabled) {
+      planningRequestRef.current?.abort();
+      clearPlanningPolygons();
+      setPlanningStatus("idle");
+      return;
+    }
+
+    void refreshPlanningZones();
+  }
+
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -691,6 +1585,8 @@ export function KakaoMapWorkspace({
 
     setSearchMessage("검색 중입니다.");
     clearSelectedParcel();
+    clearSelectedDevelopmentProject();
+    clearSelectedPlanningZone();
 
     places.keywordSearch(trimmedQuery, (result, status) => {
       if (status !== maps.services.Status.OK || !result[0]) {
@@ -724,6 +1620,41 @@ export function KakaoMapWorkspace({
     "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
     error: "필지 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<ParcelStatus, string>;
+
+  const developmentStatusMessage = {
+    idle: "공공주택·도심복합지구 경계를 표시할 수 있습니다.",
+    loading: "현재 지도 영역의 공공주택·도심복합지구를 불러오는 중입니다.",
+    ready:
+      developmentCount > 0
+        ? `공공주택·도심복합지구 ${developmentCount.toLocaleString("ko-KR")}개를 표시했습니다.${
+            developmentTruncated ? " 더 확대하면 모든 구역을 확인할 수 있습니다." : ""
+          } 보라색 구역을 클릭해 보세요.`
+        : "현재 영역에서 공공주택·도심복합지구를 찾지 못했습니다.",
+    "zoom-in": "수도권 지역을 더 확대하면 공공주택·도심복합지구가 표시됩니다.",
+    error: "공공주택·도심복합지구 경계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+  } satisfies Record<DevelopmentStatus, string>;
+
+  const planningTotal = Object.values(planningCounts).reduce(
+    (total, count) => total + count,
+    0
+  ) + maintenancePointCount;
+  const planningStatusMessage = {
+    idle: "정비·개발사업 구역과 서울·인천 공식 추진현황을 표시할 수 있습니다.",
+    loading: "현재 지도 영역의 개발계획 구역을 불러오는 중입니다.",
+    ready:
+      planningTotal > 0
+        ? `정비경계 ${planningCounts.maintenance.toLocaleString("ko-KR")} · 공식 추진현황 ${maintenancePointCount.toLocaleString("ko-KR")} · 도시개발 ${planningCounts[
+            "urban-development"
+          ].toLocaleString("ko-KR")} · 택지개발 ${planningCounts[
+            "housing-site"
+          ].toLocaleString("ko-KR")}개를 표시했습니다.${
+            planningTruncated ? " 일부 구역은 더 확대해 확인해 주세요." : ""
+          }`
+        : "현재 영역에서 정비·개발계획 구역을 찾지 못했습니다.",
+    "zoom-in": "수도권 지역을 더 확대하면 정비·개발계획 구역이 표시됩니다.",
+    "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
+    error: "정비·개발계획 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+  } satisfies Record<PlanningStatus, string>;
 
   return (
     <div className="map-page">
@@ -796,6 +1727,377 @@ export function KakaoMapWorkspace({
               {selectedCoordinates ? <small>{selectedCoordinates}</small> : null}
             </div>
           </section>
+
+          {selectedPlanningZone ? (
+            <section
+              aria-live="polite"
+              className={`parcel-detail planning-detail planning-detail--${selectedPlanningZone.category}`}
+              ref={planningDetailRef}
+            >
+              <div className="parcel-detail__header">
+                <div>
+                  <span>선택 개발계획 구역</span>
+                  <h2>{selectedPlanningZone.projectName}</h2>
+                </div>
+                <span className="parcel-detail__source planning-detail__source">
+                  {selectedPlanningZone.projectType}
+                </span>
+              </div>
+
+              <dl className="parcel-detail__list">
+                <div>
+                  <dt>구역 유형</dt>
+                  <dd>{selectedPlanningZone.projectType}</dd>
+                </div>
+                <div>
+                  <dt>지역</dt>
+                  <dd>{selectedPlanningZone.regionName || "-"}</dd>
+                </div>
+                <div>
+                  <dt>사업 면적</dt>
+                  <dd>
+                    {selectedPlanningZone.areaSquareMeters
+                      ? formatAreaWithPyeong(selectedPlanningZone.areaSquareMeters)
+                      : "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>분류</dt>
+                  <dd>{selectedPlanningZone.classification || "-"}</dd>
+                </div>
+                <div>
+                  <dt>집행 구분</dt>
+                  <dd>{selectedPlanningZone.statusName || "-"}</dd>
+                </div>
+                <div>
+                  <dt>행정구역 코드</dt>
+                  <dd>{selectedPlanningZone.districtCode || "-"}</dd>
+                </div>
+                <div>
+                  <dt>고시 식별자</dt>
+                  <dd>{selectedPlanningZone.noticeId || "-"}</dd>
+                </div>
+              </dl>
+
+              {selectedPlanningZone.category === "maintenance" &&
+              (maintenanceProjectDetail ||
+                selectedPlanningZone.districtCode.startsWith("28")) ? (
+                <div
+                  aria-busy={maintenanceMatchStatus === "loading"}
+                  className="maintenance-official"
+                >
+                  <div className="maintenance-official__heading">
+                    <strong>
+                      {maintenanceProjectDetail?.sourceProvider ?? "인천광역시"} 공식
+                      추진현황
+                    </strong>
+                    {maintenanceProjectDetail ? (
+                      <span>{maintenanceProjectDetail.sourceBaseDate} 기준</span>
+                    ) : null}
+                  </div>
+
+                  {maintenanceMatchStatus === "loading" ? (
+                    <p>공식 정비사업 자료와 구역명을 대조하고 있습니다.</p>
+                  ) : null}
+
+                  {maintenanceMatchStatus === "not-found" ? (
+                    <p>
+                      현재 공식 추진현황 파일에서 유일하게 일치하는 사업을 찾지 못했습니다.
+                      구역이 없다는 의미는 아니며 공식 고시를 함께 확인해 주세요.
+                    </p>
+                  ) : null}
+
+                  {maintenanceMatchStatus === "error" ? (
+                    <p>공식 추진현황을 불러오지 못했습니다. 잠시 후 다시 선택해 주세요.</p>
+                  ) : null}
+
+                  {maintenanceProjectDetail ? (
+                    <>
+                      <dl className="parcel-detail__list maintenance-official__list">
+                        <div>
+                          <dt>공식 사업명</dt>
+                          <dd>{maintenanceProjectDetail.projectName}</dd>
+                        </div>
+                        <div>
+                          <dt>사업 유형</dt>
+                          <dd>{maintenanceProjectDetail.projectType}</dd>
+                        </div>
+                        <div>
+                          <dt>추진 단계</dt>
+                          <dd>{maintenanceProjectDetail.businessStage}</dd>
+                        </div>
+                        {maintenanceProjectDetail.rawStage &&
+                        maintenanceProjectDetail.rawStage !==
+                          maintenanceProjectDetail.businessStage ? (
+                          <div>
+                            <dt>원문 단계</dt>
+                            <dd>{maintenanceProjectDetail.rawStage}</dd>
+                          </div>
+                        ) : null}
+                        <div>
+                          <dt>위치</dt>
+                          <dd>
+                            {[
+                              maintenanceProjectDetail.districtName,
+                              maintenanceProjectDetail.location
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>공식 면적</dt>
+                          <dd>
+                            {maintenanceProjectDetail.areaSquareMeters
+                              ? formatAreaWithPyeong(
+                                  maintenanceProjectDetail.areaSquareMeters
+                                )
+                              : "-"}
+                          </dd>
+                        </div>
+                        {maintenanceProjectDetail.details.publicPrivate ? (
+                          <div>
+                            <dt>시행 구분</dt>
+                            <dd>{maintenanceProjectDetail.details.publicPrivate}</dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.districtType ? (
+                          <div>
+                            <dt>구역 구분</dt>
+                            <dd>{maintenanceProjectDetail.details.districtType}</dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.existingHouseholds != null ? (
+                          <div>
+                            <dt>기존 세대수</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.existingHouseholds.toLocaleString(
+                                "ko-KR"
+                              )}
+                              세대
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.plannedHouseholds != null ? (
+                          <div>
+                            <dt>계획 세대수</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.plannedHouseholds.toLocaleString(
+                                "ko-KR"
+                              )}
+                              세대
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.plannedSaleHouseholds != null ? (
+                          <div>
+                            <dt>분양 계획</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.plannedSaleHouseholds.toLocaleString(
+                                "ko-KR"
+                              )}
+                              세대
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.plannedRentalHouseholds != null ? (
+                          <div>
+                            <dt>임대 계획</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.plannedRentalHouseholds.toLocaleString(
+                                "ko-KR"
+                              )}
+                              세대
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.memberCount != null ? (
+                          <div>
+                            <dt>조합원 수</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.memberCount.toLocaleString(
+                                "ko-KR"
+                              )}
+                              명
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.ownerCount != null ? (
+                          <div>
+                            <dt>소유자 수</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.ownerCount.toLocaleString(
+                                "ko-KR"
+                              )}
+                              명
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.architecturalReviewDate ? (
+                          <div>
+                            <dt>건축심의</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.architecturalReviewDate}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.districtDesignationDate ? (
+                          <div>
+                            <dt>구역 지정</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.districtDesignationDate}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.committeeApprovalDate ? (
+                          <div>
+                            <dt>추진위원회 승인</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.committeeApprovalDate}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.associationApprovalDate ? (
+                          <div>
+                            <dt>조합설립인가</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.associationApprovalDate}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.implementationApprovalDate ? (
+                          <div>
+                            <dt>사업시행인가</dt>
+                            <dd>
+                              {
+                                maintenanceProjectDetail.details
+                                  .implementationApprovalDate
+                              }
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.managementDispositionDate ? (
+                          <div>
+                            <dt>관리처분인가</dt>
+                            <dd>
+                              {
+                                maintenanceProjectDetail.details
+                                  .managementDispositionDate
+                              }
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.constructionStartDate ? (
+                          <div>
+                            <dt>착공일</dt>
+                            <dd>
+                              {maintenanceProjectDetail.details.constructionStartDate}
+                            </dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.relocationStartDate ? (
+                          <div>
+                            <dt>이주 시작</dt>
+                            <dd>{maintenanceProjectDetail.details.relocationStartDate}</dd>
+                          </div>
+                        ) : null}
+                        {maintenanceProjectDetail.details.relocationEndDate ? (
+                          <div>
+                            <dt>이주 종료</dt>
+                            <dd>{maintenanceProjectDetail.details.relocationEndDate}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                      {maintenanceProjectDetail.details.note ? (
+                        <p className="maintenance-official__note">
+                          {maintenanceProjectDetail.details.note}
+                        </p>
+                      ) : null}
+                      <a
+                        className="maintenance-official__link"
+                        href={maintenanceProjectDetail.officialUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        공식 원본 데이터 확인
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <p className="parcel-detail__notice">
+                <Info aria-hidden="true" size={15} />
+                국토교통부 VWorld 도시계획 공간정보에서 구역명으로 선별한 자료입니다.
+                사업 단계와 최신 법적 효력은 관할 기관의 고시문을 확인해 주세요.
+              </p>
+            </section>
+          ) : null}
+
+          {selectedDevelopmentProject ? (
+            <section
+              aria-live="polite"
+              className="parcel-detail development-detail"
+              ref={developmentDetailRef}
+            >
+              <div className="parcel-detail__header">
+                <div>
+                  <span>선택 공공주택·도심복합지구</span>
+                  <h2>{developmentProjectDisplayName(selectedDevelopmentProject)}</h2>
+                </div>
+                <span className="parcel-detail__source development-detail__source">
+                  공식정보
+                </span>
+              </div>
+
+              <dl className="parcel-detail__list">
+                <div>
+                  <dt>사업 유형</dt>
+                  <dd>{selectedDevelopmentProject.projectType}</dd>
+                </div>
+                <div>
+                  <dt>지역</dt>
+                  <dd>{selectedDevelopmentProject.regionName}</dd>
+                </div>
+                <div>
+                  <dt>사업 면적</dt>
+                  <dd>
+                    {selectedDevelopmentProject.areaSquareMeters
+                      ? formatAreaWithPyeong(selectedDevelopmentProject.areaSquareMeters)
+                      : "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>고시일</dt>
+                  <dd>{selectedDevelopmentProject.noticeDate || "-"}</dd>
+                </div>
+                <div>
+                  <dt>행정구역 코드</dt>
+                  <dd>{selectedDevelopmentProject.districtCode || "-"}</dd>
+                </div>
+                <div>
+                  <dt>고시 식별자</dt>
+                  <dd>{selectedDevelopmentProject.noticeId || "-"}</dd>
+                </div>
+                {selectedDevelopmentProject.remark ? (
+                  <div>
+                    <dt>비고</dt>
+                    <dd>{selectedDevelopmentProject.remark}</dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt>자료 기준</dt>
+                  <dd>{selectedDevelopmentProject.sourceBaseDate || "2026-07"}</dd>
+                </div>
+              </dl>
+
+              <p className="parcel-detail__notice">
+                <Info aria-hidden="true" size={15} />
+                국토교통부 공공주택지구 공간파일을 웹용으로 변환한 자료입니다. 최신
+                법적 효력과 사업 단계는 해당 고시문을 확인해 주세요.
+              </p>
+            </section>
+          ) : null}
 
           {selectedParcel ? (
             <section
@@ -924,6 +2226,62 @@ export function KakaoMapWorkspace({
             {parcelStatusMessage[parcelStatus]}
           </p>
 
+          <button
+            aria-pressed={developmentLayerEnabled}
+            className={`map-layer-preview map-layer-preview--development${
+              developmentLayerEnabled ? " map-layer-preview--active" : ""
+            }`}
+            disabled={mapStatus !== "ready"}
+            onClick={handleDevelopmentLayerToggle}
+            type="button"
+          >
+            <div>
+              <Building2 aria-hidden="true" size={18} />
+              <span>공공주택·도심복합지구</span>
+            </div>
+            <span className="map-layer-preview__status">
+              {developmentLayerEnabled ? "켜짐" : "꺼짐"}
+            </span>
+          </button>
+
+          <p
+            className={`map-layer-message map-layer-message--${developmentStatus}`}
+            role="status"
+          >
+            {developmentStatusMessage[developmentStatus]}
+          </p>
+
+          <button
+            aria-pressed={planningLayerEnabled}
+            className={`map-layer-preview map-layer-preview--planning${
+              planningLayerEnabled ? " map-layer-preview--active" : ""
+            }`}
+            disabled={mapStatus !== "ready"}
+            onClick={handlePlanningLayerToggle}
+            type="button"
+          >
+            <div>
+              <MapPin aria-hidden="true" size={18} />
+              <span>정비·개발사업</span>
+            </div>
+            <span className="map-layer-preview__status">
+              {planningLayerEnabled ? "켜짐" : "꺼짐"}
+            </span>
+          </button>
+
+          <div aria-label="개발계획 구역 색상" className="planning-legend">
+            <span><i className="planning-legend__swatch planning-legend__swatch--maintenance" />정비 구역·위치</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--urban" />도시개발</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--housing" />택지개발</span>
+          </div>
+
+          <p
+            className={`map-layer-message map-layer-message--${planningStatus}`}
+            role="status"
+          >
+            {planningStatusMessage[planningStatus]}
+          </p>
+
           <div className="map-coming-soon">
             <div>
               <Database aria-hidden="true" size={17} />
@@ -936,7 +2294,8 @@ export function KakaoMapWorkspace({
           </div>
 
           <p className="map-sidebar__notice">
-            다음 단계에서 PNU를 기준으로 실거래가와 용도지역 정보를 연결합니다.
+            신속통합기획·모아타운·도심공공복합사업은 공식 이용조건을 확인한
+            데이터부터 순차적으로 추가합니다.
           </p>
         </aside>
 
@@ -971,6 +2330,8 @@ export function KakaoMapWorkspace({
           ) : null}
 
           <div className="map-source-badge">
+            {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
+            {planningLayerEnabled ? "정비·개발계획 © VWorld · " : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao
           </div>

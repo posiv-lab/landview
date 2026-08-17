@@ -1802,6 +1802,77 @@ button:disabled {
   font-weight: var(--weight-bold);
 }
 
+.development-detail {
+  border-color: color-mix(in srgb, #7c3aed 28%, var(--border-default));
+  background: color-mix(in srgb, #f5f3ff 42%, var(--surface-canvas));
+}
+
+.development-detail__source {
+  background: #ede9fe;
+  color: #5b21b6 !important;
+}
+
+.planning-detail {
+  border-color: color-mix(in srgb, #0f766e 28%, var(--border-default));
+  background: color-mix(in srgb, #f0fdfa 42%, var(--surface-canvas));
+}
+
+.planning-detail--maintenance {
+  border-color: color-mix(in srgb, #dc2626 30%, var(--border-default));
+}
+
+.planning-detail--urban-development {
+  border-color: color-mix(in srgb, #0369a1 30%, var(--border-default));
+}
+
+.planning-detail__source {
+  background: #e0f2fe;
+  color: #075985 !important;
+}
+
+.maintenance-official {
+  display: grid;
+  gap: var(--space-250);
+  border: 1px solid color-mix(in srgb, #dc2626 18%, var(--border-default));
+  border-radius: var(--radius-300);
+  background: color-mix(in srgb, #fff7ed 74%, var(--surface-canvas));
+  padding: var(--space-350);
+}
+
+.maintenance-official__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-250);
+}
+
+.maintenance-official__heading strong {
+  color: var(--text-heading);
+  font-size: var(--size-250);
+}
+
+.maintenance-official__heading span,
+.maintenance-official > p,
+.maintenance-official__note {
+  margin: 0;
+  color: var(--text-caption);
+  font-size: var(--size-200);
+  line-height: 1.5;
+}
+
+.maintenance-official__list > div:first-child {
+  border-top: 0;
+}
+
+.maintenance-official__link {
+  justify-self: start;
+  color: var(--brand-strong-fg);
+  font-size: var(--size-200);
+  font-weight: var(--weight-bold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .parcel-detail__list {
   display: grid;
   margin: 0;
@@ -1885,6 +1956,70 @@ button:disabled {
 .map-layer-preview--active .map-layer-preview__status {
   background: var(--brand);
   color: var(--text-inverse);
+}
+
+.map-layer-preview--development {
+  margin-top: var(--space-400);
+}
+
+.map-layer-preview--development:hover:not(:disabled),
+.map-layer-preview--development.map-layer-preview--active {
+  border-color: #a78bfa;
+  background: #f5f3ff;
+}
+
+.map-layer-preview--development.map-layer-preview--active
+  .map-layer-preview__status {
+  background: #6d28d9;
+}
+
+.map-layer-preview--planning {
+  margin-top: var(--space-400);
+}
+
+.map-layer-preview--planning:hover:not(:disabled),
+.map-layer-preview--planning.map-layer-preview--active {
+  border-color: #0f766e;
+  background: #f0fdfa;
+}
+
+.map-layer-preview--planning.map-layer-preview--active
+  .map-layer-preview__status {
+  background: #0f766e;
+}
+
+.planning-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-300);
+  margin: var(--space-300) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.planning-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-150);
+}
+
+.planning-legend__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #0f766e;
+}
+
+.planning-legend__swatch--maintenance {
+  background: #dc2626;
+}
+
+.planning-legend__swatch--urban {
+  background: #0369a1;
+}
+
+.planning-legend__swatch--housing {
+  background: #0f766e;
 }
 
 .map-layer-preview > div,

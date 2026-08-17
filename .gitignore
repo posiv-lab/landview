@@ -16,3 +16,6 @@ pnpm-debug.log*
 .agents/
 .claude/settings.local.json
 .vercel
+__pycache__/
+*.py[cod]
+*.tsbuildinfo

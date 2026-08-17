@@ -93,14 +93,14 @@ declare global {
     event: {
       preventMap(): void;
       addListener(
-        target: KakaoMap | KakaoPolygon,
+        target: KakaoMap | KakaoMarker | KakaoPolygon,
         type: "click" | "idle",
-        handler: (event: { latLng: KakaoLatLng }) => void
+        handler: ((event: { latLng: KakaoLatLng }) => void) | (() => void)
       ): void;
       removeListener(
-        target: KakaoMap | KakaoPolygon,
+        target: KakaoMap | KakaoMarker | KakaoPolygon,
         type: "click" | "idle",
-        handler: (event: { latLng: KakaoLatLng }) => void
+        handler: ((event: { latLng: KakaoLatLng }) => void) | (() => void)
       ): void;
     };
     services: {
