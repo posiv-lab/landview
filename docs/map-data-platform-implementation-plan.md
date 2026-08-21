@@ -141,6 +141,20 @@
 
 MVP에서는 물건목록, 물건상세, 물건상세 입찰정보 3종부터 활용 신청한다. 물건 상태가 자주 바뀌므로 1~3시간 간격으로 동기화하고, 종료된 물건도 마지막 상태를 다시 확인한다. 실제 활용 신청 후 샘플 응답과 운영 엔드포인트를 확인하고 `OnbidAdapter` 내부에서 공급자 응답을 공통 스키마로 변환한다.
 
+### 2.6 호재(개발 호재) 레이어와 관리자 데이터 입력
+
+정비사업(재건축·재개발), 철도역 개발·계획, 택지지구·신도시, 산업단지, 도로확장 같은 "개발 호재"는 도시계획시설·고시 데이터(§2.4)와 달리 **전국 통합 공식 API가 없고 지자체·기관별로 파편화**되어 있다. 실거래·규제·공매처럼 API 자동 수집만으로는 채울 수 없으므로, 관리자 입력을 1차 데이터 확보 수단으로 병행한다.
+
+- **표시 방식**: 종류별 색상·아이콘·범례로 구분되는 구역 폴리곤(zone) + 포인트 마커(point). 필지 리포트(§4)에 실거래·규제·공매·경매와 나란히 "개발 호재" 항목으로 결합한다.
+- **관리자 백오피스**:
+  - 지도 위에 폴리곤을 **직접 그려서** 구역 등록·수정
+  - 캡처 이미지(지자체 고시 도면 등)를 지도 위에 **반투명 밑그림으로 배치**하고 위치·크기·투명도를 조절하며 **따라 그리기** — 좌표 정보가 없는 고시 이미지를 폴리곤화하는 보조 입력 도구
+  - 점형 호재는 주소 입력 → 자동 지오코딩으로 좌표 등록
+  - **CSV/엑셀 일괄 업로드**로 점형 호재 다건 등록
+  - 종류·진행 단계(계획/결정/고시/공사/완료/변경·취소) 관리 — §2.4의 상태 표시 원칙과 동일하게 적용
+- **참고 데이터 소스** (지역 한정, 관리자 검수 필요): 서울 열린데이터광장·도시공간포털, 경기도청 고시·공고, 인천시 고시·공고, LH 택지정보지도(jigu.go.kr), KICOX 산업단지 공공데이터, 국가철도공단·레일포털(철도역은 API 자동 수집 가능)
+- **범위**: 1차는 수도권(서울·경기·인천) 한정 — 전국 확장은 데이터 파편화 문제로 후순위
+
 ## 3. 법원경매 데이터 확보 전략
 
 ### 조사 결과
@@ -342,6 +356,19 @@ affected_pnu NULL
 source_updated_at
 ```
 
+### `hojae_zones` (개발 호재 — 관리자 입력 중심)
+
+```text
+id PK
+hojae_type       # 정비사업, 철도역, 택지지구, 산업단지, 도로확장 등
+project_status   # 계획/결정/고시/공사/완료/변경·취소
+geom NULL        # 폴리곤(zone) 또는 포인트(point)
+input_method     # ADMIN_DRAW, IMAGE_TRACE, GEOCODE, CSV_BULK, API_SYNC
+source_reference NULL
+created_by
+source_updated_at
+```
+
 ### `auction_listings`
 
 ```text
@@ -378,6 +405,7 @@ source_updated_at
 app/
   map/page.tsx
   parcel/[pnu]/page.tsx
+  admin/hojae/page.tsx
   api/
     map/parcels/route.ts
     map/layers/[layer]/route.ts
@@ -385,6 +413,7 @@ app/
     transactions/route.ts
     auctions/route.ts
     development/route.ts
+    admin/hojae/route.ts
 
 src/
   components/map/
@@ -392,6 +421,10 @@ src/
     KakaoMap.tsx
     LayerControl.tsx
     ParcelInfoPanel.tsx
+  components/admin/
+    HojaePolygonEditor.tsx
+    ImageOverlayTracer.tsx
+    HojaeCsvUpload.tsx
   lib/
     geo/
       coordinates.ts
@@ -646,6 +679,7 @@ COURT_AUCTION_PROVIDER_API_KEY=
 - [ ] 관심 필지와 알림
 - [ ] 개발 공고 타임라인
 - [ ] 필지 비교·공유
+- [ ] 호재 레이어(정비사업·철도·택지·산업단지·도로확장) + 관리자 입력 도구(폴리곤 그리기, 이미지 트레이싱, CSV 일괄 업로드)
 
 ### P3 — 확장
 
