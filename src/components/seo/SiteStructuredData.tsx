@@ -39,7 +39,7 @@ export function SiteStructuredData() {
       {
         "@type": "WebApplication",
         "@id": `${SITE_URL}/#webapp`,
-        url: absoluteUrl("/map"),
+        url: absoluteUrl("/"),
         name: `${SITE_NAME} 지도`,
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",

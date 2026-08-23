@@ -20,13 +20,13 @@ export async function Header() {
         </Link>
         <nav aria-label="주요 섹션" className="site-nav">
           {navLinks.map((link) => (
-            <a href={`/${link.href}`} key={link.href}>
+            <a href={`/about${link.href}`} key={link.href}>
               {link.label}
             </a>
           ))}
         </nav>
         <div className="header-actions">
-          <Button href="/map" variant="secondary">
+          <Button href="/" variant="secondary">
             지도 열기
           </Button>
           <ContactButton variant="secondary">문의하기</ContactButton>

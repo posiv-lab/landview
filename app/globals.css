@@ -1607,18 +1607,28 @@ button:disabled {
   font-weight: var(--weight-bold);
 }
 
-.map-toolbar__back {
+.map-toolbar__lead {
   display: inline-flex;
-  min-height: 40px;
   align-items: center;
-  gap: var(--space-200);
+  gap: var(--space-300);
+  white-space: nowrap;
+}
+
+/* 브랜드 우측의 소개 버튼 — 마케팅 소개 페이지로 이동 */
+.map-toolbar__intro {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-400);
+  padding: 0 var(--space-300);
   color: var(--text-body);
   font-size: var(--size-300);
   font-weight: var(--weight-bold);
 }
 
-.map-toolbar__back:hover {
+.map-toolbar__intro:hover {
+  border-color: var(--brand-strong-fg);
   color: var(--brand-strong-fg);
 }
 
@@ -1945,6 +1955,139 @@ button:disabled {
   font-size: var(--size-300);
 }
 
+/* 지도 위 정비사업 이정표 — 공식 사업명 + 사업유형(신속통합·모아타운·재개발/재건축 등) */
+.map-project-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 7px;
+  cursor: pointer;
+  /* 카카오 오버레이는 기본 폰트를 상속하지 않는다 */
+  font-family: inherit;
+  line-height: 1.25;
+}
+
+.map-project-pin__body {
+  display: flex;
+  max-width: 210px;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid #1d4ed8;
+  border-radius: var(--radius-full);
+  background: #2563eb;
+  padding: 5px 11px;
+  box-shadow: 0 3px 10px rgba(29, 78, 216, 0.35);
+  color: #ffffff;
+  text-align: center;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.map-project-pin:hover .map-project-pin__body,
+.map-project-pin:focus-visible .map-project-pin__body {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.map-project-pin:focus-visible {
+  outline: none;
+}
+
+.map-project-pin:focus-visible .map-project-pin__body {
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+}
+
+.map-project-pin__name {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-project-pin__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+}
+
+.map-project-pin__badge {
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.22);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* 신속통합기획·모아타운 등 정책 유형은 더 밝게 강조 */
+.map-project-pin__badge--program {
+  background: #fde68a;
+  color: #78350f;
+}
+
+/* 재개발 / 재건축 해당사항 */
+.map-project-pin__badge--category {
+  background: #ffffff;
+  color: #1d4ed8;
+}
+
+/* 축소 상태 — 라벨이 겹치므로 점으로만 표시하고 사업명은 툴팁으로 남긴다 */
+.map-project-pin--compact {
+  padding-bottom: 0;
+}
+
+.map-project-pin--compact .map-project-pin__body {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: var(--radius-full);
+  background: #2563eb;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.4);
+}
+
+.map-project-pin--compact:hover .map-project-pin__body,
+.map-project-pin--compact:focus-visible .map-project-pin__body {
+  background: #1d4ed8;
+  transform: scale(1.25);
+}
+
+.map-project-pin__tail {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-top: 8px solid #2563eb;
+  border-right: 6px solid transparent;
+  border-left: 6px solid transparent;
+  transform: translateX(-50%);
+}
+
+.map-project-pin:hover .map-project-pin__tail,
+.map-project-pin:focus-visible .map-project-pin__tail {
+  border-top-color: #1d4ed8;
+}
+
+@media (max-width: 768px) {
+  .map-project-pin__body {
+    max-width: 150px;
+  }
+
+  .map-project-pin__name {
+    font-size: 11px;
+  }
+}
+
 .map-layer-preview {
   display: flex;
   width: 100%;
@@ -2036,6 +2179,41 @@ button:disabled {
 
 .planning-legend__swatch--housing {
   background: #0f766e;
+}
+
+.planning-legend__swatch--fast-track {
+  background: #c2410c;
+}
+
+.planning-legend__swatch--moa {
+  background: #7e22ce;
+}
+
+/* 신속통합·모아타운 레이어 토글 */
+.map-layer-preview--policy {
+  margin-top: var(--space-400);
+}
+
+.map-layer-preview--policy:hover:not(:disabled),
+.map-layer-preview--policy.map-layer-preview--active {
+  border-color: #c2410c;
+  background: #fff7ed;
+}
+
+.map-layer-preview--policy.map-layer-preview--active .map-layer-preview__status {
+  background: #c2410c;
+}
+
+.map-layer-source-note {
+  margin: var(--space-250) 0 0;
+  color: var(--text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.policy-detail {
+  border-color: color-mix(in srgb, #c2410c 28%, var(--border-default));
+  background: color-mix(in srgb, #fff7ed 46%, var(--surface-canvas));
 }
 
 .map-layer-preview > div,
@@ -2295,10 +2473,6 @@ button:disabled {
     grid-template-columns: auto minmax(220px, 1fr) auto;
   }
 
-  .map-toolbar__back {
-    display: none;
-  }
-
   .map-workspace {
     grid-template-columns: 300px minmax(0, 1fr);
   }
@@ -2443,8 +2617,9 @@ button:disabled {
     padding: var(--space-300);
   }
 
-  .map-toolbar__brand {
+  .map-toolbar__lead {
     justify-self: start;
+    gap: var(--space-200);
   }
 
   .map-toolbar__actions {

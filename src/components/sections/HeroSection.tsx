@@ -22,7 +22,7 @@ export function HeroSection() {
           </div>
           <SearchBox />
           <div className="hero__actions">
-            <Button href="/map" size="lg">
+            <Button href="/" size="lg">
               지도에서 시작하기
             </Button>
             <Button href="#features" size="lg" variant="secondary">

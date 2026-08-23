@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: absoluteUrl("/map"),
+      url: absoluteUrl("/about"),
       changeFrequency: "weekly",
       priority: 0.9,
     },

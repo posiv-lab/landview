@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowLeft,
   Building2,
   Database,
   Info,
@@ -11,10 +10,12 @@ import {
   MapPin,
   Search,
   ShieldCheck,
+  Sparkles,
   TriangleAlert
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { ContactButton } from "@/components/contact/ContactDialog";
 import { Button } from "@/components/ui/Button";
 
 type KakaoMapWorkspaceProps = {
@@ -171,6 +172,39 @@ type MaintenanceProjectCollection = {
   type: "LandViewMaintenanceProjectCollection";
 };
 
+type PolicyProgramme = "신속통합기획" | "모아타운";
+
+type PolicyZoneDetail = {
+  areaSquareMeters: number | null;
+  bounds: [number, number, number, number];
+  districtCode: string;
+  districtName: string;
+  noticeDate: string;
+  programTags: string[];
+  projectName: string;
+  projectType: PolicyProgramme;
+  regionName: string;
+  sourceBaseDate: string;
+  sourceLicense: string;
+  sourceName: string;
+  sourceUrl: string;
+  stageName: string;
+};
+
+type PolicyZoneCollection = {
+  features: Array<{
+    geometry: PolygonGeometry | MultiPolygonGeometry | null;
+    id: string;
+    properties: PolicyZoneDetail;
+    type: "Feature";
+  }>;
+  metadata: { sourceBaseDate: string; sourceLicense: string; sourceName: string };
+  total: number;
+  type: "FeatureCollection";
+};
+
+type PolicyStatus = "idle" | "loading" | "ready" | "error" | "zoom-in";
+
 type MaintenanceMatchStatus = "idle" | "loading" | "ready" | "not-found" | "error";
 
 type PlanningFeatureCollection = {
@@ -221,7 +255,8 @@ type PlanningPolygonEntry = ParcelPolygonEntry;
 
 type MaintenanceMarkerEntry = {
   clickHandler: () => void;
-  marker: KakaoMarker;
+  element: HTMLElement;
+  overlay: KakaoCustomOverlay;
 };
 
 const DEFAULT_PARCEL_STYLE = {
@@ -288,6 +323,24 @@ const SELECTED_PLANNING_STYLE = {
   fillOpacity: 0.3
 };
 
+// 서울시 정책사업 구역 — 신속통합기획/모아타운을 서로 다른 색으로 구분한다.
+const POLICY_ZONE_STYLES: Record<PolicyProgramme, typeof DEFAULT_DEVELOPMENT_STYLE> = {
+  신속통합기획: {
+    strokeWeight: 2,
+    strokeColor: "#c2410c",
+    strokeOpacity: 0.95,
+    fillColor: "#fb923c",
+    fillOpacity: 0.18
+  },
+  모아타운: {
+    strokeWeight: 2,
+    strokeColor: "#7e22ce",
+    strokeOpacity: 0.95,
+    fillColor: "#c084fc",
+    fillOpacity: 0.18
+  }
+};
+
 function textValue(value: unknown) {
   if (typeof value === "string") {
     return value.trim();
@@ -315,6 +368,95 @@ const PROGRAM_TAG_LABELS: Record<string, string> = {
 
 function programTagLabels(tags: string[] | undefined) {
   return (tags ?? []).map((tag) => PROGRAM_TAG_LABELS[tag] ?? tag);
+}
+
+// 원천 데이터의 사업유형 문자열을 지도 라벨용 짧은 표기로 정리한다.
+// 예) "주택정비형재개발" → "재개발", "주거환경개선(현지개량)" → "주거환경개선"
+const PROJECT_TYPE_SHORT_LABELS: Array<{ label: string; test: RegExp }> = [
+  { label: "공공주택 복합지구", test: /공공주택\s*복합/ },
+  { label: "공공주택지구", test: /공공주택지구/ },
+  { label: "가로주택정비", test: /가로주택/ },
+  { label: "자율주택정비", test: /자율주택/ },
+  { label: "소규모재건축", test: /소규모재건축/ },
+  { label: "소규모재개발", test: /소규모재개발/ },
+  { label: "재정비촉진", test: /재정비촉진/ },
+  { label: "주거환경개선", test: /주거환경개선/ },
+  { label: "구역지정 후보지", test: /후보지/ },
+  { label: "재개발", test: /재개발/ },
+  { label: "재건축", test: /재건축/ }
+];
+
+function projectTypeShortLabel(projectType: string) {
+  const normalized = projectType.trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  return (
+    PROJECT_TYPE_SHORT_LABELS.find(({ test }) => test.test(normalized))?.label ??
+    normalized
+  );
+}
+
+// 정비사업의 "재개발 / 재건축" 해당 여부. 소규모·가로주택 유형도 상위 갈래로 함께 표기한다.
+function redevelopmentCategoryLabel(projectType: string) {
+  const normalized = projectType.trim();
+
+  if (/재개발/.test(normalized)) {
+    return "재개발";
+  }
+
+  if (/재건축/.test(normalized)) {
+    return "재건축";
+  }
+
+  // 가로주택·자율주택은 소규모주택정비법상 재건축 계열로 분류된다.
+  if (/가로주택|자율주택/.test(normalized)) {
+    return "재건축";
+  }
+
+  return "";
+}
+
+// 지도 라벨에 노출할 사업유형 배지 목록.
+// 신속통합기획·모아타운·공공주택 복합지구 같은 정책 유형을 앞에 두고,
+// 재개발/재건축 해당사항을 뒤에 함께 붙인다.
+// VWorld 구역 데이터처럼 유형이 "정비구역"으로만 오는 경우가 있어
+// 사업명에서도 재개발/재건축 갈래를 찾아 보완한다.
+function projectTypeBadges({
+  programTags,
+  projectName = "",
+  projectType
+}: {
+  programTags?: string[];
+  projectName?: string;
+  projectType: string;
+}) {
+  const badges: Array<{ kind: "program" | "type" | "category"; label: string }> = [];
+  const seen = new Set<string>();
+
+  const push = (kind: "program" | "type" | "category", label: string) => {
+    const normalized = label.trim();
+
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    badges.push({ kind, label: normalized });
+  };
+
+  programTagLabels(programTags).forEach((label) => push("program", label));
+
+  const shortType = projectTypeShortLabel(projectType);
+  push("type", shortType);
+  push(
+    "category",
+    redevelopmentCategoryLabel(projectType) || redevelopmentCategoryLabel(projectName)
+  );
+
+  return badges;
 }
 
 const OFFICIAL_POLICY_SOURCES = [
@@ -419,6 +561,147 @@ function formatArea(value: number) {
 
 function formatAreaWithPyeong(value: number) {
   return `${formatArea(value)}㎡ (${formatArea(value / SQUARE_METERS_PER_PYEONG)}평)`;
+}
+
+// 폴리곤에서 라벨을 세울 대표 지점. 가장 넓은 외곽 링의 무게중심을 쓴다.
+function representativePoint(
+  geometry: PolygonGeometry | MultiPolygonGeometry | null
+): { latitude: number; longitude: number } | null {
+  if (!geometry) {
+    return null;
+  }
+
+  const polygons =
+    geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  let bestRing: number[][] | null = null;
+  let bestArea = -1;
+
+  polygons.forEach((polygon) => {
+    const ring = polygon?.[0];
+
+    if (!Array.isArray(ring) || ring.length < 3) {
+      return;
+    }
+
+    const area = ringAreaSquareMeters(ring);
+
+    if (area > bestArea) {
+      bestArea = area;
+      bestRing = ring;
+    }
+  });
+
+  if (!bestRing) {
+    return null;
+  }
+
+  const points = (bestRing as number[][]).filter(
+    (coordinate) =>
+      coordinate.length >= 2 &&
+      Number.isFinite(coordinate[0]) &&
+      Number.isFinite(coordinate[1])
+  );
+
+  if (points.length === 0) {
+    return null;
+  }
+
+  // 면적 가중 무게중심(shoelace). 면적이 0이면 좌표 평균으로 되돌린다.
+  let twiceArea = 0;
+  let longitude = 0;
+  let latitude = 0;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const [x1, y1] = points[index];
+    const [x2, y2] = points[(index + 1) % points.length];
+    const cross = x1 * y2 - x2 * y1;
+    twiceArea += cross;
+    longitude += (x1 + x2) * cross;
+    latitude += (y1 + y2) * cross;
+  }
+
+  if (Math.abs(twiceArea) < 1e-12) {
+    const sum = points.reduce(
+      (accumulator, [x, y]) => ({ x: accumulator.x + x, y: accumulator.y + y }),
+      { x: 0, y: 0 }
+    );
+
+    return { latitude: sum.y / points.length, longitude: sum.x / points.length };
+  }
+
+  return {
+    latitude: latitude / (3 * twiceArea),
+    longitude: longitude / (3 * twiceArea)
+  };
+}
+
+// 이 레벨보다 축소하면 라벨이 서로 겹쳐 지도를 가린다. 그 이상에서는 점으로만 표시한다.
+const PROJECT_LABEL_MAX_LEVEL = 5;
+
+// 지도 위 파란 이정표 라벨 DOM. 정비사업 지점과 구역 폴리곤이 함께 쓴다.
+// compact 모드에서는 사업명·유형을 툴팁으로만 두고 작은 점으로 줄인다.
+function createProjectPinElement({
+  badges,
+  compact,
+  projectName
+}: {
+  badges: ReturnType<typeof projectTypeBadges>;
+  compact: boolean;
+  projectName: string;
+}) {
+  const summary = [projectName, ...badges.map(({ label }) => label)].join(" · ");
+  const element = document.createElement("div");
+  element.className = compact
+    ? "map-project-pin map-project-pin--compact"
+    : "map-project-pin";
+  element.setAttribute("role", "button");
+  element.setAttribute("tabindex", "0");
+  element.title = summary;
+
+  const body = document.createElement("span");
+  body.className = "map-project-pin__body";
+
+  if (compact) {
+    const label = document.createElement("span");
+    label.className = "sr-only";
+    label.textContent = summary;
+    body.append(label);
+    element.append(body);
+  } else {
+    const name = document.createElement("strong");
+    name.className = "map-project-pin__name";
+    name.textContent = projectName;
+    body.append(name);
+
+    if (badges.length > 0) {
+      const badgeList = document.createElement("span");
+      badgeList.className = "map-project-pin__badges";
+      badges.forEach(({ kind, label }) => {
+        const badge = document.createElement("span");
+        badge.className = `map-project-pin__badge map-project-pin__badge--${kind}`;
+        badge.textContent = label;
+        badgeList.append(badge);
+      });
+      body.append(badgeList);
+    }
+
+    element.append(body);
+
+    const tail = document.createElement("span");
+    tail.className = "map-project-pin__tail";
+    tail.setAttribute("aria-hidden", "true");
+    element.append(tail);
+  }
+
+  // 키보드로도 선택할 수 있게 Enter/Space를 클릭으로 넘긴다.
+  element.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      element.click();
+    }
+  });
+
+  return element;
 }
 
 function developmentProjectDisplayName(project: DevelopmentProjectDetail) {
@@ -528,6 +811,9 @@ export function KakaoMapWorkspace({
   const developmentPolygonsRef = useRef<DevelopmentPolygonEntry[]>([]);
   const planningPolygonsRef = useRef<PlanningPolygonEntry[]>([]);
   const maintenanceMarkersRef = useRef<MaintenanceMarkerEntry[]>([]);
+  const policyPolygonsRef = useRef<PlanningPolygonEntry[]>([]);
+  const policyMarkersRef = useRef<MaintenanceMarkerEntry[]>([]);
+  const selectedPolicyPolygonsRef = useRef<KakaoPolygon[]>([]);
   const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
   const selectedDevelopmentPolygonsRef = useRef<KakaoPolygon[]>([]);
   const selectedPlanningPolygonsRef = useRef<KakaoPolygon[]>([]);
@@ -535,16 +821,20 @@ export function KakaoMapWorkspace({
   const developmentRequestRef = useRef<AbortController | null>(null);
   const developmentDataRef = useRef<DevelopmentFeatureCollection | null>(null);
   const planningRequestRef = useRef<AbortController | null>(null);
+  const policyRequestRef = useRef<AbortController | null>(null);
+  const policyDataRef = useRef<PolicyZoneCollection | null>(null);
   const maintenanceMatchRequestRef = useRef<AbortController | null>(null);
   const maintenanceDataRef = useRef<MaintenanceProjectCollection | null>(null);
   const landLedgerRequestRef = useRef<AbortController | null>(null);
   const parcelLayerEnabledRef = useRef(false);
   const developmentLayerEnabledRef = useRef(false);
   const planningLayerEnabledRef = useRef(false);
+  const policyLayerEnabledRef = useRef(false);
   const parcelClickGuardRef = useRef(false);
   const refreshParcelsRef = useRef<() => void>(() => undefined);
   const refreshDevelopmentProjectsRef = useRef<() => void>(() => undefined);
   const refreshPlanningZonesRef = useRef<() => void>(() => undefined);
+  const refreshPolicyZonesRef = useRef<() => void>(() => undefined);
 
   const [mapStatus, setMapStatus] = useState<MapStatus>(appKey ? "loading" : "missing-key");
   const [query, setQuery] = useState("");
@@ -554,6 +844,16 @@ export function KakaoMapWorkspace({
   const [parcelLayerEnabled, setParcelLayerEnabled] = useState(false);
   const [developmentLayerEnabled, setDevelopmentLayerEnabled] = useState(false);
   const [planningLayerEnabled, setPlanningLayerEnabled] = useState(false);
+  const [policyLayerEnabled, setPolicyLayerEnabled] = useState(false);
+  const [policyStatus, setPolicyStatus] = useState<PolicyStatus>("idle");
+  const [policyCounts, setPolicyCounts] = useState<Record<PolicyProgramme, number>>({
+    신속통합기획: 0,
+    모아타운: 0
+  });
+  const [policySourceNote, setPolicySourceNote] = useState("");
+  const [selectedPolicyZone, setSelectedPolicyZone] = useState<PolicyZoneDetail | null>(
+    null
+  );
   const [parcelStatus, setParcelStatus] = useState<ParcelStatus>("idle");
   const [developmentStatus, setDevelopmentStatus] =
     useState<DevelopmentStatus>("idle");
@@ -671,9 +971,9 @@ export function KakaoMapWorkspace({
       maps?.event.removeListener(polygon, "click", clickHandler);
       polygon.setMap(null);
     });
-    maintenanceMarkersRef.current.forEach(({ clickHandler, marker }) => {
-      maps?.event.removeListener(marker, "click", clickHandler);
-      marker.setMap(null);
+    maintenanceMarkersRef.current.forEach(({ clickHandler, element, overlay }) => {
+      element.removeEventListener("click", clickHandler);
+      overlay.setMap(null);
     });
     planningPolygonsRef.current = [];
     maintenanceMarkersRef.current = [];
@@ -740,6 +1040,227 @@ export function KakaoMapWorkspace({
       setLandLedgerStatus("error");
     }
   }, []);
+
+  const clearPolicyZones = useCallback(() => {
+    policyRequestRef.current?.abort();
+    policyPolygonsRef.current.forEach(({ clickHandler, polygon }) => {
+      mapsApiRef.current?.event.removeListener(polygon, "click", clickHandler);
+      polygon.setMap(null);
+    });
+    policyMarkersRef.current.forEach(({ clickHandler, element, overlay }) => {
+      element.removeEventListener("click", clickHandler);
+      overlay.setMap(null);
+    });
+    policyPolygonsRef.current = [];
+    policyMarkersRef.current = [];
+    selectedPolicyPolygonsRef.current = [];
+    setPolicyCounts({ 신속통합기획: 0, 모아타운: 0 });
+    setSelectedPolicyZone(null);
+  }, []);
+
+  const refreshPolicyZones = useCallback(async () => {
+    const maps = mapsApiRef.current;
+    const map = mapRef.current;
+
+    if (!maps || !map || !policyLayerEnabledRef.current) {
+      return;
+    }
+
+    if (map.getLevel() > 10) {
+      policyRequestRef.current?.abort();
+      clearPolicyZones();
+      setPolicyStatus("zoom-in");
+      return;
+    }
+
+    policyRequestRef.current?.abort();
+    const controller = new AbortController();
+    policyRequestRef.current = controller;
+    setPolicyStatus("loading");
+
+    try {
+      let collection = policyDataRef.current;
+
+      if (!collection) {
+        const response = await fetch("/data/seoul-policy-zones.geojson", {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error("POLICY_ZONES_REQUEST_FAILED");
+        }
+
+        collection = (await response.json()) as PolicyZoneCollection;
+        policyDataRef.current = collection;
+      }
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      clearPolicyZones();
+
+      const useCompactPins = map.getLevel() > PROJECT_LABEL_MAX_LEVEL;
+      const bounds = map.getBounds();
+      const southWest = bounds.getSouthWest();
+      const northEast = bounds.getNorthEast();
+      const counts: Record<PolicyProgramme, number> = {
+        신속통합기획: 0,
+        모아타운: 0
+      };
+
+      const visibleFeatures = collection.features.filter((feature) => {
+        const [minLongitude, minLatitude, maxLongitude, maxLatitude] =
+          feature.properties.bounds;
+
+        return (
+          maxLongitude >= southWest.getLng() &&
+          minLongitude <= northEast.getLng() &&
+          maxLatitude >= southWest.getLat() &&
+          minLatitude <= northEast.getLat()
+        );
+      });
+
+      visibleFeatures.forEach((feature) => {
+        if (!feature.geometry) {
+          return;
+        }
+
+        const programme = feature.properties.projectType;
+        const featurePolygons: KakaoPolygon[] = [];
+        const polygons =
+          feature.geometry.type === "Polygon"
+            ? [feature.geometry.coordinates]
+            : feature.geometry.coordinates;
+
+        polygons.forEach((polygonCoordinates) => {
+          const paths = polygonCoordinates
+            .map((ring) =>
+              ring
+                .filter(
+                  (coordinate) =>
+                    coordinate.length >= 2 &&
+                    Number.isFinite(coordinate[0]) &&
+                    Number.isFinite(coordinate[1])
+                )
+                .map((coordinate) => new maps.LatLng(coordinate[1], coordinate[0]))
+            )
+            .filter((ring) => ring.length >= 3);
+
+          if (paths.length === 0) {
+            return;
+          }
+
+          const polygon = new maps.Polygon({
+            map,
+            path: paths.length === 1 ? paths[0] : paths,
+            strokeStyle: "solid",
+            ...POLICY_ZONE_STYLES[programme]
+          });
+          (
+            polygon as KakaoPolygon & { policyProgramme?: PolicyProgramme }
+          ).policyProgramme = programme;
+          featurePolygons.push(polygon);
+        });
+
+        if (featurePolygons.length === 0) {
+          return;
+        }
+
+        counts[programme] += 1;
+
+        const selectZone = (latLng: KakaoLatLng) => {
+          parcelClickGuardRef.current = true;
+          clearSelectedParcel();
+          clearSelectedDevelopmentProject();
+
+          selectedPolicyPolygonsRef.current.forEach((polygon) => {
+            const previous = (
+              polygon as KakaoPolygon & { policyProgramme?: PolicyProgramme }
+            ).policyProgramme;
+            polygon.setOptions(
+              previous ? POLICY_ZONE_STYLES[previous] : POLICY_ZONE_STYLES.모아타운
+            );
+          });
+          featurePolygons.forEach((polygon) => {
+            polygon.setOptions(SELECTED_PLANNING_STYLE);
+          });
+
+          selectedPolicyPolygonsRef.current = featurePolygons;
+          setSelectedPolicyZone(feature.properties);
+          setSelectedAddress(feature.properties.projectName);
+          setSelectedCoordinates(
+            `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
+          );
+          setSearchMessage(`${programme} 구역을 선택했습니다.`);
+          moveMarker(latLng);
+
+          window.requestAnimationFrame(() => {
+            parcelClickGuardRef.current = false;
+          });
+        };
+
+        const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+          maps.event.preventMap();
+          selectZone(latLng);
+        };
+
+        featurePolygons.forEach((polygon) => {
+          maps.event.addListener(polygon, "click", clickHandler);
+          policyPolygonsRef.current.push({ clickHandler, polygon });
+        });
+
+        const labelPoint = representativePoint(feature.geometry);
+
+        if (labelPoint) {
+          const labelPosition = new maps.LatLng(
+            labelPoint.latitude,
+            labelPoint.longitude
+          );
+          const labelElement = createProjectPinElement({
+            badges: projectTypeBadges({
+              programTags: feature.properties.programTags,
+              projectName: feature.properties.projectName,
+              projectType: feature.properties.projectType
+            }),
+            compact: useCompactPins,
+            projectName: feature.properties.projectName
+          });
+          const labelClickHandler = () => {
+            selectZone(labelPosition);
+          };
+          const labelOverlay = new maps.CustomOverlay({
+            clickable: true,
+            content: labelElement,
+            map,
+            position: labelPosition,
+            yAnchor: 1,
+            zIndex: 5
+          });
+
+          labelElement.addEventListener("click", labelClickHandler);
+          policyMarkersRef.current.push({
+            clickHandler: labelClickHandler,
+            element: labelElement,
+            overlay: labelOverlay
+          });
+        }
+      });
+
+      setPolicyCounts(counts);
+      setPolicySourceNote(
+        `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
+      );
+      setPolicyStatus("ready");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      clearPolicyZones();
+      setPolicyStatus("error");
+    }
+  }, [clearPolicyZones, clearSelectedDevelopmentProject, clearSelectedParcel]);
 
   const refreshParcels = useCallback(async () => {
     const maps = mapsApiRef.current;
@@ -1108,6 +1629,8 @@ export function KakaoMapWorkspace({
       return;
     }
 
+    // 넓게 축소한 상태에서 라벨을 전부 세우면 서로 겹쳐 지도를 덮는다.
+    const useCompactPins = map.getLevel() > PROJECT_LABEL_MAX_LEVEL;
     const bounds = map.getBounds();
     const southWest = bounds.getSouthWest();
     const northEast = bounds.getNorthEast();
@@ -1244,8 +1767,7 @@ export function KakaoMapWorkspace({
 
           counts[category] += 1;
 
-          const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
-            maps.event.preventMap();
+          const selectZone = (latLng: KakaoLatLng) => {
             parcelClickGuardRef.current = true;
             clearSelectedParcel();
             clearSelectedDevelopmentProject();
@@ -1279,10 +1801,53 @@ export function KakaoMapWorkspace({
             });
           };
 
+          const clickHandler = ({ latLng }: { latLng: KakaoLatLng }) => {
+            maps.event.preventMap();
+            selectZone(latLng);
+          };
+
           featurePolygons.forEach((polygon) => {
             maps.event.addListener(polygon, "click", clickHandler);
             planningPolygonsRef.current.push({ clickHandler, polygon });
           });
+
+          // 구역 위에 공식 사업명·사업유형 이정표를 세운다.
+          const labelPoint = representativePoint(feature.geometry);
+
+          if (labelPoint) {
+            const labelPosition = new maps.LatLng(
+              labelPoint.latitude,
+              labelPoint.longitude
+            );
+            const labelElement = createProjectPinElement({
+              badges: projectTypeBadges({
+                programTags: feature.properties.programTags,
+                projectName: feature.properties.projectName,
+                projectType: feature.properties.projectType
+              }),
+              compact: useCompactPins,
+              projectName: feature.properties.projectName
+            });
+            // clickable 오버레이라 지도로 전파되지 않는다. preventMap 없이 선택만 수행한다.
+            const labelClickHandler = () => {
+              selectZone(labelPosition);
+            };
+            const labelOverlay = new maps.CustomOverlay({
+              clickable: true,
+              content: labelElement,
+              map,
+              position: labelPosition,
+              yAnchor: 1,
+              zIndex: 3
+            });
+
+            labelElement.addEventListener("click", labelClickHandler);
+            maintenanceMarkersRef.current.push({
+              clickHandler: labelClickHandler,
+              element: labelElement,
+              overlay: labelOverlay
+            });
+          }
         });
       });
 
@@ -1304,7 +1869,24 @@ export function KakaoMapWorkspace({
           project.center.latitude,
           project.center.longitude
         );
-        const marker = new maps.Marker({ map, position });
+        const element = createProjectPinElement({
+          badges: projectTypeBadges({
+            programTags: project.programTags,
+            projectName: project.projectName,
+            projectType: project.projectType
+          }),
+          compact: useCompactPins,
+          projectName: project.projectName
+        });
+
+        const overlay = new maps.CustomOverlay({
+          clickable: true,
+          content: element,
+          map,
+          position,
+          yAnchor: 1,
+          zIndex: 4
+        });
         const clickHandler = () => {
           const regionName =
             project.regionCode === "11"
@@ -1312,7 +1894,7 @@ export function KakaoMapWorkspace({
               : project.regionCode === "28"
                 ? "인천광역시"
                 : "경기도";
-          maps.event.preventMap();
+          // clickable 오버레이라 지도 클릭으로 전파되지 않는다. 필지 선택만 막아둔다.
           parcelClickGuardRef.current = true;
           maintenanceMatchRequestRef.current?.abort();
           clearSelectedParcel();
@@ -1360,8 +1942,8 @@ export function KakaoMapWorkspace({
           });
         };
 
-        maps.event.addListener(marker, "click", clickHandler);
-        maintenanceMarkersRef.current.push({ clickHandler, marker });
+        element.addEventListener("click", clickHandler);
+        maintenanceMarkersRef.current.push({ clickHandler, element, overlay });
       });
 
       setPlanningCounts(counts);
@@ -1405,6 +1987,12 @@ export function KakaoMapWorkspace({
       void refreshPlanningZones();
     };
   }, [refreshPlanningZones]);
+
+  useEffect(() => {
+    refreshPolicyZonesRef.current = () => {
+      void refreshPolicyZones();
+    };
+  }, [refreshPolicyZones]);
 
   useEffect(() => {
     if (!selectedParcel) {
@@ -1508,6 +2096,7 @@ export function KakaoMapWorkspace({
             refreshParcelsRef.current();
             refreshDevelopmentProjectsRef.current();
             refreshPlanningZonesRef.current();
+            refreshPolicyZonesRef.current();
           }, 350);
         };
         maps.event.addListener(map, "idle", idleHandler);
@@ -1560,6 +2149,24 @@ export function KakaoMapWorkspace({
       );
       planningPolygonsRef.current = [];
       selectedPlanningPolygonsRef.current = [];
+      policyRequestRef.current?.abort();
+      policyPolygonsRef.current.forEach(
+        ({ clickHandler: polygonClickHandler, polygon }) => {
+          mapsApiRef.current?.event.removeListener(polygon, "click", polygonClickHandler);
+          polygon.setMap(null);
+        }
+      );
+      policyPolygonsRef.current = [];
+      selectedPolicyPolygonsRef.current = [];
+      // 라벨 오버레이는 DOM 리스너를 쓰므로 여기서 함께 해제한다.
+      [...maintenanceMarkersRef.current, ...policyMarkersRef.current].forEach(
+        ({ clickHandler: overlayClickHandler, element, overlay }) => {
+          element.removeEventListener("click", overlayClickHandler);
+          overlay.setMap(null);
+        }
+      );
+      maintenanceMarkersRef.current = [];
+      policyMarkersRef.current = [];
       parcelClickGuardRef.current = false;
       markerRef.current?.setMap(null);
     };
@@ -1613,6 +2220,21 @@ export function KakaoMapWorkspace({
     }
 
     void refreshPlanningZones();
+  }
+
+  function handlePolicyLayerToggle() {
+    const nextEnabled = !policyLayerEnabled;
+    policyLayerEnabledRef.current = nextEnabled;
+    setPolicyLayerEnabled(nextEnabled);
+
+    if (!nextEnabled) {
+      policyRequestRef.current?.abort();
+      clearPolicyZones();
+      setPolicyStatus("idle");
+      return;
+    }
+
+    void refreshPolicyZones();
   }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -1699,6 +2321,17 @@ export function KakaoMapWorkspace({
     "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
     error: "정비·개발계획 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<PlanningStatus, string>;
+  const policyTotal = policyCounts.신속통합기획 + policyCounts.모아타운;
+  const policyStatusMessage = {
+    idle: "서울시 신속통합기획·모아타운 구역을 표시할 수 있습니다.",
+    loading: "현재 지도 영역의 정책사업 구역을 불러오는 중입니다.",
+    ready:
+      policyTotal > 0
+        ? `신속통합기획 ${policyCounts.신속통합기획.toLocaleString("ko-KR")} · 모아타운 ${policyCounts.모아타운.toLocaleString("ko-KR")}개를 표시했습니다.`
+        : "현재 영역에서 신속통합기획·모아타운 구역을 찾지 못했습니다.",
+    "zoom-in": "서울 지역을 더 확대하면 신속통합기획·모아타운 구역이 표시됩니다.",
+    error: "정책사업 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+  } satisfies Record<PolicyStatus, string>;
   const selectedProgramLabels = selectedPlanningZone
     ? programTagLabels([
         ...new Set([
@@ -1711,12 +2344,17 @@ export function KakaoMapWorkspace({
   return (
     <div className="map-page">
       <header className="map-toolbar">
-        <Link aria-label="땅뷰 홈으로 돌아가기" className="map-toolbar__brand" href="/">
-          <span className="brand-mark__symbol">
-            <Map aria-hidden="true" size={19} />
-          </span>
-          <span>땅뷰</span>
-        </Link>
+        <div className="map-toolbar__lead">
+          <Link aria-label="땅뷰 홈으로 돌아가기" className="map-toolbar__brand" href="/">
+            <span className="brand-mark__symbol">
+              <Map aria-hidden="true" size={19} />
+            </span>
+            <span>땅뷰</span>
+          </Link>
+          <Link className="map-toolbar__intro" href="/about">
+            소개
+          </Link>
+        </div>
 
         <form className="map-search" onSubmit={handleSearch}>
           <Search aria-hidden="true" size={19} />
@@ -1737,10 +2375,6 @@ export function KakaoMapWorkspace({
         </form>
 
         <div className="map-toolbar__actions">
-          <Link className="map-toolbar__back" href="/">
-            <ArrowLeft aria-hidden="true" size={17} />
-            소개
-          </Link>
           {currentUser ? (
             <>
               <Button href="/account" size="sm" variant="secondary">
@@ -1750,7 +2384,7 @@ export function KakaoMapWorkspace({
             </>
           ) : (
             <>
-              <Button href="/login?next=/map" size="sm" variant="ghost">
+              <Button href="/login?next=/" size="sm" variant="ghost">
                 로그인
               </Button>
               <Button href="/signup" size="sm">
@@ -1758,6 +2392,9 @@ export function KakaoMapWorkspace({
               </Button>
             </>
           )}
+          <ContactButton size="sm" variant="secondary">
+            문의하기
+          </ContactButton>
         </div>
       </header>
 
@@ -2094,6 +2731,70 @@ export function KakaoMapWorkspace({
             </section>
           ) : null}
 
+          {selectedPolicyZone ? (
+            <section aria-live="polite" className="parcel-detail policy-detail">
+              <div className="parcel-detail__header">
+                <div>
+                  <p className="eyebrow">선택 정책사업 구역</p>
+                  <h2>{selectedPolicyZone.projectName}</h2>
+                </div>
+                <div className="parcel-detail__tags">
+                  <span className="parcel-detail__tag">
+                    {selectedPolicyZone.projectType}
+                  </span>
+                  {selectedPolicyZone.stageName ? (
+                    <span className="parcel-detail__tag">
+                      {selectedPolicyZone.stageName}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <dl className="parcel-detail__list">
+                <div>
+                  <dt>사업 유형</dt>
+                  <dd>{selectedPolicyZone.projectType}</dd>
+                </div>
+                <div>
+                  <dt>추진 단계</dt>
+                  <dd>{selectedPolicyZone.stageName || "-"}</dd>
+                </div>
+                <div>
+                  <dt>지역</dt>
+                  <dd>{selectedPolicyZone.regionName || "-"}</dd>
+                </div>
+                <div>
+                  <dt>구역 면적</dt>
+                  <dd>
+                    {selectedPolicyZone.areaSquareMeters
+                      ? formatAreaWithPyeong(selectedPolicyZone.areaSquareMeters)
+                      : "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>자료 기준일</dt>
+                  <dd>{selectedPolicyZone.sourceBaseDate || "-"}</dd>
+                </div>
+              </dl>
+
+              <a
+                className="maintenance-official__link"
+                href={selectedPolicyZone.sourceUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                서울플랜+ 원본 데이터 보기 ↗
+              </a>
+
+              <p className="parcel-detail__notice">
+                <Info aria-hidden="true" size={15} />
+                {selectedPolicyZone.sourceName} ({selectedPolicyZone.sourceLicense}).
+                법적 효력이 없는 참고 자료이며, 최신 추진 단계는 관할 자치구 고시를
+                확인해 주세요.
+              </p>
+            </section>
+          ) : null}
+
           {selectedDevelopmentProject ? (
             <section
               aria-live="polite"
@@ -2342,6 +3043,50 @@ export function KakaoMapWorkspace({
             {planningStatusMessage[planningStatus]}
           </p>
 
+          <button
+            aria-pressed={policyLayerEnabled}
+            className={`map-layer-preview map-layer-preview--policy${
+              policyLayerEnabled ? " map-layer-preview--active" : ""
+            }`}
+            disabled={mapStatus !== "ready"}
+            onClick={handlePolicyLayerToggle}
+            type="button"
+          >
+            <div>
+              <Sparkles aria-hidden="true" size={18} />
+              <span>신속통합·모아타운</span>
+            </div>
+            <span className="map-layer-preview__status">
+              {policyLayerEnabled ? "켜짐" : "꺼짐"}
+            </span>
+          </button>
+
+          <div aria-label="정책사업 구역 색상" className="planning-legend">
+            <span>
+              <i className="planning-legend__swatch planning-legend__swatch--fast-track" />
+              신속통합기획
+            </span>
+            <span>
+              <i className="planning-legend__swatch planning-legend__swatch--moa" />
+              모아타운
+            </span>
+          </div>
+
+          <p
+            className={`map-layer-message map-layer-message--${policyStatus}`}
+            role="status"
+          >
+            {policyStatusMessage[policyStatus]}
+          </p>
+
+          {policySourceNote ? (
+            <p className="map-layer-source-note">
+              출처: {policySourceNote}. 공공누리 제4유형(출처표시·상업적이용금지·변경금지)
+              자료로 비상업 목적의 지도 표시에만 사용합니다. 법적 효력이 없는 참고
+              자료이며 최신 내용은 공식 원문으로 확인해 주세요.
+            </p>
+          ) : null}
+
           <section aria-labelledby="official-policy-title" className="official-policy-sources">
             <div className="official-policy-sources__heading">
               <Database aria-hidden="true" size={17} />
@@ -2357,9 +3102,9 @@ export function KakaoMapWorkspace({
               ))}
             </div>
             <p>
-              신속통합기획·모아타운 원문은 공공누리 제4유형입니다. 무료 공개
-              서비스에서도 형식 변경이 금지되어 원문 링크로 제공하며, 지도에는
-              변경 가능한 공식 API·파일만 표시합니다.
+              신속통합기획·모아타운 구역은 서울플랜+ 공간정보(공공누리 제4유형)를
+              비상업 목적으로 지도에 표시합니다. 집계 건수와 최신 단계는 위 공식
+              원문이 기준이며, 지도 표시는 참고 자료입니다.
             </p>
           </section>
 
@@ -2413,6 +3158,7 @@ export function KakaoMapWorkspace({
           <div className="map-source-badge">
             {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
             {planningLayerEnabled ? "정비·개발계획 © VWorld · " : ""}
+            {policyLayerEnabled ? "신속통합·모아타운 © 서울특별시 서울플랜+ · " : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao
           </div>

@@ -1,26 +1,6 @@
-import type { Metadata } from "next";
-import { KakaoMapWorkspace } from "@/components/map/KakaoMapWorkspace";
-import { getCurrentUser } from "@/lib/auth/session";
-import { createPublicMetadata } from "@/lib/seo";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = createPublicMetadata({
-  title: "지도에서 토지 정보 찾기",
-  description:
-    "주소나 장소를 검색하고 지도에서 필지 경계, 지목, 토지대장 면적을 확인하세요.",
-  path: "/map",
-});
-
-export default async function MapPage() {
-  const vworldConfigured = Boolean(
-    process.env.VWORLD_API_KEY?.trim() && process.env.VWORLD_DOMAIN?.trim()
-  );
-  const user = await getCurrentUser();
-
-  return (
-    <KakaoMapWorkspace
-      appKey={process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY?.trim() ?? ""}
-      currentUser={user ? { nickname: user.nickname } : null}
-      vworldConfigured={vworldConfigured}
-    />
-  );
+// 지도는 이제 루트 경로에서 제공한다. 기존 /map 링크와 색인은 루트로 넘긴다.
+export default function MapPage() {
+  permanentRedirect("/");
 }

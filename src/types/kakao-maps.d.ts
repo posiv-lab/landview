@@ -23,6 +23,13 @@ declare global {
     setPosition(position: KakaoLatLng): void;
   }
 
+  interface KakaoCustomOverlay {
+    getContent(): HTMLElement | string;
+    setMap(map: KakaoMap | null): void;
+    setPosition(position: KakaoLatLng): void;
+    setZIndex(zIndex: number): void;
+  }
+
   interface KakaoPolygon {
     setMap(map: KakaoMap | null): void;
     setOptions(options: {
@@ -80,6 +87,15 @@ declare global {
       map: KakaoMap;
       position: KakaoLatLng;
     }) => KakaoMarker;
+    CustomOverlay: new (options: {
+      clickable?: boolean;
+      content: HTMLElement | string;
+      map: KakaoMap;
+      position: KakaoLatLng;
+      xAnchor?: number;
+      yAnchor?: number;
+      zIndex?: number;
+    }) => KakaoCustomOverlay;
     Polygon: new (options: {
       map: KakaoMap;
       path: KakaoLatLng[] | KakaoLatLng[][];
