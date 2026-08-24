@@ -189,11 +189,18 @@ type ProjectZoneDetail = {
   districtName: string;
   noticeDate: string;
   normalizedName: string;
+  parcelAddress?: string;
   partCount: number;
   programTags: string[];
   projectName: string;
   projectType: string;
   regionName: string;
+  // 대표 1필지만 그린 구역(경기 소규모정비)인지 여부
+  representativeParcelOnly?: boolean;
+  sourceBaseDate: string;
+  sourceLicense: string;
+  sourceName: string;
+  sourceUrl: string;
   stageName: string;
 };
 
@@ -957,9 +964,6 @@ export function KakaoMapWorkspace({
     () => ({ ...EMPTY_ZONE_COUNTS })
   );
   const [policySourceNote, setPolicySourceNote] = useState("");
-  const [policySource, setPolicySource] = useState<
-    ProjectZoneCollection["metadata"] | null
-  >(null);
   const [selectedPolicyZone, setSelectedPolicyZone] = useState<ProjectZoneDetail | null>(
     null
   );
@@ -1174,22 +1178,54 @@ export function KakaoMapWorkspace({
     }
 
     if (!policyLoadRef.current) {
-      policyLoadRef.current = fetch("/data/seoul-project-zones.geojson")
-        .then((response) => {
+      // 서울(서울플랜+)과 경기 소규모정비(PNU 기준 대표 필지)를 한 레이어로 묶는다.
+      policyLoadRef.current = Promise.all(
+        [
+          { required: true, url: "/data/seoul-project-zones.geojson" },
+          { required: false, url: "/data/gyeonggi-small-scale-zones.geojson" }
+        ].map(async ({ required, url }) => {
+          const response = await fetch(url);
+
           if (!response.ok) {
-            throw new Error("PROJECT_ZONES_REQUEST_FAILED");
+            if (required) {
+              throw new Error("PROJECT_ZONES_REQUEST_FAILED");
+            }
+
+            return null;
           }
 
-          return response.json() as Promise<ProjectZoneCollection>;
+          return (await response.json()) as ProjectZoneCollection;
         })
-        .then((collection) => {
-          policyDataRef.current = collection;
-          zoneNameIndexRef.current = new Set(
-            collection.features
-              .map((feature) => feature.properties.normalizedName)
-              .filter(Boolean)
+      )
+        .then((collections) => {
+          const loaded = collections.filter(
+            (value): value is ProjectZoneCollection => value !== null
           );
-          return collection;
+          // 출처·이용조건이 자료마다 다르므로 각 구역에 함께 새겨 둔다.
+          const features = loaded.flatMap((collection) =>
+            collection.features.map((feature) => ({
+              ...feature,
+              properties: {
+                ...feature.properties,
+                sourceBaseDate: collection.metadata.sourceBaseDate,
+                sourceLicense: collection.metadata.sourceLicense,
+                sourceName: collection.metadata.sourceName,
+                sourceUrl: collection.metadata.sourceUrl
+              }
+            }))
+          );
+          const merged: ProjectZoneCollection = {
+            features,
+            metadata: loaded[0].metadata,
+            total: features.length,
+            type: "FeatureCollection"
+          };
+
+          policyDataRef.current = merged;
+          zoneNameIndexRef.current = new Set(
+            features.map((feature) => feature.properties.normalizedName).filter(Boolean)
+          );
+          return merged;
         })
         .catch((error) => {
           policyLoadRef.current = null;
@@ -1392,7 +1428,6 @@ export function KakaoMapWorkspace({
       setPolicySourceNote(
         `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
       );
-      setPolicySource(collection.metadata);
       setPolicyStatus("ready");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -2512,7 +2547,7 @@ export function KakaoMapWorkspace({
     0
   );
   const policyStatusMessage = {
-    idle: "서울시 재개발·재건축·신속통합·모아타운 구역을 표시할 수 있습니다.",
+    idle: "서울 재개발·재건축·신속통합·모아타운과 경기 소규모정비 구역을 표시할 수 있습니다.",
     loading: "현재 지도 영역의 정비사업 구역을 불러오는 중입니다.",
     ready:
       policyTotal > 0
@@ -2535,8 +2570,8 @@ export function KakaoMapWorkspace({
                 ].toLocaleString("ko-KR")}`
             )
             .join(" · ")}개 구역을 표시했습니다.`
-        : "현재 영역에서 서울 정비사업 구역을 찾지 못했습니다.",
-    "zoom-in": "서울 지역을 더 확대하면 정비사업 구역이 표시됩니다.",
+        : "현재 영역에서 정비사업 구역을 찾지 못했습니다.",
+    "zoom-in": "수도권 지역을 더 확대하면 정비사업 구역이 표시됩니다.",
     error: "정비사업 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<PolicyStatus, string>;
   const selectedProgramLabels = selectedPlanningZone
@@ -2984,27 +3019,27 @@ export function KakaoMapWorkspace({
                 </div>
                 <div>
                   <dt>자료 기준일</dt>
-                  <dd>{policySource?.sourceBaseDate || "-"}</dd>
+                  <dd>{selectedPolicyZone.sourceBaseDate || "-"}</dd>
                 </div>
               </dl>
 
               <a
                 className="maintenance-official__link"
-                href={
-                  policySource?.sourceUrl ??
-                  "https://data.seoul.go.kr/dataList/OA-22712/F/1/datasetView.do"
-                }
+                href={selectedPolicyZone.sourceUrl}
                 rel="noreferrer"
                 target="_blank"
               >
-                서울플랜+ 원본 데이터 보기 ↗
+                원본 데이터 보기 ↗
               </a>
 
               <p className="parcel-detail__notice">
                 <Info aria-hidden="true" size={15} />
-                {policySource?.sourceName} ({policySource?.sourceLicense}). 법적
-                효력이 없는 참고 자료이며, 최신 추진 단계는 관할 자치구 고시를 확인해
-                주세요.
+                {selectedPolicyZone.sourceName} ({selectedPolicyZone.sourceLicense}).
+                {selectedPolicyZone.representativeParcelOnly
+                  ? " 구역 전체 경계가 아니라 대표 1필지만 표시합니다."
+                  : ""}{" "}
+                법적 효력이 없는 참고 자료이며, 최신 추진 단계는 관할 지자체 고시를
+                확인해 주세요.
               </p>
             </section>
           ) : null}
@@ -3268,14 +3303,14 @@ export function KakaoMapWorkspace({
           >
             <div>
               <Sparkles aria-hidden="true" size={18} />
-              <span>서울 정비사업 구역</span>
+              <span>정비사업 구역</span>
             </div>
             <span className="map-layer-preview__status">
               {policyLayerEnabled ? "켜짐" : "꺼짐"}
             </span>
           </button>
 
-          <div aria-label="서울 정비사업 구역 색상" className="planning-legend">
+          <div aria-label="정비사업 구역 색상" className="planning-legend">
             {(
               [
                 "redevelopment",
@@ -3305,9 +3340,11 @@ export function KakaoMapWorkspace({
 
           {policySourceNote ? (
             <p className="map-layer-source-note">
-              출처: {policySourceNote}. 공공누리 제4유형(출처표시·상업적이용금지·변경금지)
-              자료로 비상업 목적의 지도 표시에만 사용합니다. 법적 효력이 없는 참고
-              자료이며 최신 내용은 공식 원문으로 확인해 주세요.
+              출처: 서울 구역은 {policySourceNote}(공공누리 제4유형)로 비상업 목적의
+              지도 표시에만 사용합니다. 경기 소규모정비 구역은 경기부동산포털 자료의
+              필지고유번호로 연속지적도에서 대표 1필지만 표시하며, 구역 전체 경계가
+              아닙니다. 모두 법적 효력이 없는 참고 자료이니 최신 내용은 공식 원문으로
+              확인해 주세요.
             </p>
           ) : null}
 
@@ -3382,7 +3419,7 @@ export function KakaoMapWorkspace({
           <div className="map-source-badge">
             {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
             {planningLayerEnabled ? "정비·개발계획 © VWorld · " : ""}
-            {policyLayerEnabled ? "서울 정비사업 구역 © 서울특별시 서울플랜+ · " : ""}
+            {policyLayerEnabled ? "정비사업 구역 © 서울특별시 서울플랜+ · 경기도 · " : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao
           </div>
