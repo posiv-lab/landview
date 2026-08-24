@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "data:bundang-zones": "node scripts/generate-bundang-special-zones.mjs"
+    "data:bundang-zones": "node scripts/generate-bundang-special-zones.mjs",
+    "data:gyeonggi-new-town-zones": "node scripts/generate-gyeonggi-new-town-special-zones.mjs",
+    "data:gyeonggi-zone-labels": "node scripts/label-unmatched-gyeonggi-zones.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

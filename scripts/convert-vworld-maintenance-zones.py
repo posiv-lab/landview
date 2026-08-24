@@ -56,6 +56,39 @@ GROUP_ID_COLUMNS = ("MNUM", "MNG_NO", "DGM_NO", "ZONE_ID", "OBJECTID")
 DISTRICT_COLUMNS = ("COL_ADM_SE", "SIG_CD", "SIGNGU_SE", "SGG_CD")
 NAME_COLUMNS = ("ALIAS", "DGM_NM", "ZONE_NM", "NAME", "DGM_NAME")
 NOTICE_DATE_COLUMNS = ("NTFDATE", "NTFC_DATE", "NOTICE_DT")
+DISTRICT_NAMES = {
+    "41110": "수원시",
+    "41130": "성남시",
+    "41150": "의정부시",
+    "41170": "안양시",
+    "41190": "부천시",
+    "41210": "광명시",
+    "41220": "평택시",
+    "41250": "동두천시",
+    "41270": "안산시",
+    "41280": "고양시",
+    "41290": "과천시",
+    "41310": "구리시",
+    "41360": "남양주시",
+    "41370": "오산시",
+    "41390": "시흥시",
+    "41410": "군포시",
+    "41430": "의왕시",
+    "41450": "하남시",
+    "41460": "용인시",
+    "41480": "파주시",
+    "41500": "이천시",
+    "41550": "안성시",
+    "41570": "김포시",
+    "41590": "화성시",
+    "41610": "광주시",
+    "41630": "양주시",
+    "41650": "포천시",
+    "41670": "여주시",
+    "41800": "연천군",
+    "41820": "가평군",
+    "41830": "양평군",
+}
 
 
 def clean(value: Any) -> str:
@@ -102,6 +135,15 @@ def category(project_type: str) -> str:
     if "재개발" in project_type:
         return "redevelopment"
     return "legal-zone"
+
+
+def fallback_zone_name(district_code: str, source_id: str) -> str:
+    district = DISTRICT_NAMES.get(district_code, "경기")
+    date_match = re.search(r"(20\d{6})", source_id)
+    notice_id = date_match.group(1) if date_match else "고시"
+    serial_match = re.search(r"(\d{4})$", source_id)
+    serial = serial_match.group(1) if serial_match else source_id[-4:]
+    return f"{district} 법정 정비구역 · 고시ID {notice_id}/{serial}"
 
 
 def date_text(value: Any) -> str:
@@ -343,7 +385,13 @@ def main() -> None:
             match = matches.get(zone_index)
             project = projects[match[0]] if match else {}
             project_name = clean(project.get("projectName")) or zone["source_name"]
-            district_name = clean(project.get("districtName"))
+            if not project_name:
+                project_name = fallback_zone_name(
+                    zone["district_code"], zone["source_id"]
+                )
+            district_name = clean(project.get("districtName")) or DISTRICT_NAMES.get(
+                zone["district_code"], ""
+            )
             project_type = clean(project.get("projectType")) or "법정 정비구역"
             web_mapping = mapping(web_row.geometry)
             rounded_geometry = shape(
@@ -376,7 +424,7 @@ def main() -> None:
                 "matchAreaErrorRate": round(match[2], 5) if match else None,
                 "sourceGeometryId": zone["source_id"],
                 "geometryRepaired": zone["geometry_repaired"] or output_repaired,
-                "showLabel": bool(project_name),
+                "showLabel": True,
                 "bounds": [round(min_x, 6), round(min_y, 6), round(max_x, 6), round(max_y, 6)],
             }
             features.append(

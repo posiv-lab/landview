@@ -1835,6 +1835,22 @@ button:disabled {
   border-color: color-mix(in srgb, #0369a1 30%, var(--border-default));
 }
 
+.planning-detail--industrial-complex {
+  border-color: color-mix(in srgb, #7c3aed 30%, var(--border-default));
+}
+
+.planning-detail--road-plan {
+  border-color: color-mix(in srgb, #d97706 30%, var(--border-default));
+}
+
+.planning-detail--rail-plan {
+  border-color: color-mix(in srgb, #4f46e5 30%, var(--border-default));
+}
+
+.planning-detail--traffic-plaza {
+  border-color: color-mix(in srgb, #be123c 30%, var(--border-default));
+}
+
 .planning-detail__source {
   background: #e0f2fe;
   color: #075985 !important;
@@ -2179,6 +2195,22 @@ button:disabled {
 
 .planning-legend__swatch--housing {
   background: #0f766e;
+}
+
+.planning-legend__swatch--industrial {
+  background: #7c3aed;
+}
+
+.planning-legend__swatch--road-plan {
+  background: #d97706;
+}
+
+.planning-legend__swatch--rail-plan {
+  background: #4f46e5;
+}
+
+.planning-legend__swatch--traffic-plaza {
+  background: #be123c;
 }
 
 /* 정비사업 구역 범례 — 폴리곤 색과 1:1로 맞춘다 */

@@ -40,7 +40,14 @@ type DevelopmentStatus =
   | "zoom-in"
   | "error";
 
-type PlanningCategory = "maintenance" | "urban-development" | "housing-site";
+type PlanningCategory =
+  | "maintenance"
+  | "urban-development"
+  | "housing-site"
+  | "industrial-complex"
+  | "road-plan"
+  | "rail-plan"
+  | "traffic-plaza";
 
 type PlanningStatus =
   | "idle"
@@ -199,6 +206,8 @@ type ProjectZoneDetail = {
   regionName: string;
   boundaryKind?: "legal" | "special-legal" | "programme" | "representative-parcel";
   matchMethod?: "point" | "area" | "unmatched";
+  geometryNote?: string;
+  nameStatus?: "official-name-unmatched";
   reportedAreaSquareMeters?: number | null;
   showLabel?: boolean;
   // 이전 경기 소규모정비 대표 필지 자료와의 하위 호환용. 새 레이어에는 사용하지 않는다.
@@ -336,6 +345,34 @@ const PLANNING_ZONE_STYLES: Record<PlanningCategory, typeof DEFAULT_DEVELOPMENT_
     strokeOpacity: 0.9,
     fillColor: "#2dd4bf",
     fillOpacity: 0.13
+  },
+  "industrial-complex": {
+    strokeWeight: 2,
+    strokeColor: "#7c3aed",
+    strokeOpacity: 0.95,
+    fillColor: "#a78bfa",
+    fillOpacity: 0.18
+  },
+  "road-plan": {
+    strokeWeight: 3,
+    strokeColor: "#d97706",
+    strokeOpacity: 0.95,
+    fillColor: "#fbbf24",
+    fillOpacity: 0.15
+  },
+  "rail-plan": {
+    strokeWeight: 3,
+    strokeColor: "#4f46e5",
+    strokeOpacity: 0.95,
+    fillColor: "#818cf8",
+    fillOpacity: 0.16
+  },
+  "traffic-plaza": {
+    strokeWeight: 2,
+    strokeColor: "#be123c",
+    strokeOpacity: 0.95,
+    fillColor: "#fb7185",
+    fillOpacity: 0.2
   }
 };
 
@@ -689,9 +726,24 @@ const OFFICIAL_POLICY_SOURCES = [
     url: "https://www.vworld.kr/dtmk/dtmk_ntads_s002.do?svcCde=MK&dsId=30335"
   },
   {
-    name: "분당 노후계획도시 특별정비구역",
-    summary: "성남시 선도지구 지정·지형도면 고시",
+    name: "경기 1기 신도시 특별정비구역",
+    summary: "분당 4·평촌 2·산본 2·중동 1곳 지정 고시",
     url: "https://www.seongnam.go.kr/pm010301/145352"
+  },
+  {
+    name: "평촌 노후계획도시 특별정비구역",
+    summary: "안양시 A-17·A-18 지정 고시",
+    url: "https://anyang.go.kr/main/emwsWebView.do?key=4101&pageIndex=1&pageUnit=1470&regiNo=28295&searchCnd=all&searchGosiSe=01%2C03%2C04&searchKrwd="
+  },
+  {
+    name: "산본 노후계획도시 특별정비구역",
+    summary: "군포시 9-2·11구역 지정 고시",
+    url: "https://www.gunpo.go.kr/www/selectEminwonView.do?key=3907&notAncmtSeCd=01&not_ancmt_mgt_no=43544"
+  },
+  {
+    name: "중동 은하마을 특별정비구역",
+    summary: "부천시 고시 제2026-107호",
+    url: "https://www.eum.go.kr/web/gs/gv/gvGosiDet.jsp?seq=636087"
   },
   {
     name: "경기도 정비사업 온누리",
@@ -1081,7 +1133,11 @@ export function KakaoMapWorkspace({
   const [planningCounts, setPlanningCounts] = useState<Record<PlanningCategory, number>>({
     maintenance: 0,
     "urban-development": 0,
-    "housing-site": 0
+    "housing-site": 0,
+    "industrial-complex": 0,
+    "road-plan": 0,
+    "rail-plan": 0,
+    "traffic-plaza": 0
   });
   const [planningTruncated, setPlanningTruncated] = useState(false);
   const [maintenancePointCount, setMaintenancePointCount] = useState(0);
@@ -1198,7 +1254,11 @@ export function KakaoMapWorkspace({
     setPlanningCounts({
       maintenance: 0,
       "urban-development": 0,
-      "housing-site": 0
+      "housing-site": 0,
+      "industrial-complex": 0,
+      "road-plan": 0,
+      "rail-plan": 0,
+      "traffic-plaza": 0
     });
     setPlanningTruncated(false);
     setMaintenancePointCount(0);
@@ -1289,7 +1349,7 @@ export function KakaoMapWorkspace({
         [
           { required: true, url: "/data/seoul-project-zones.geojson" },
           { required: false, url: "/data/gyeonggi-legal-maintenance-zones.geojson" },
-          { required: false, url: "/data/bundang-special-maintenance-zones.geojson" }
+          { required: false, url: "/data/gyeonggi-new-town-special-zones.geojson" }
         ].map(async ({ required, url }) => {
           const response = await fetch(url);
 
@@ -1576,7 +1636,7 @@ export function KakaoMapWorkspace({
       setPolicyCounts(counts);
       setPolicySourceNote(
         collection.features.some(({ properties }) => properties.boundaryKind === "legal")
-          ? "서울플랜+ · VWorld 법정 정비구역(UD602) · 분당 특별정비구역 · 준공·입주·청산 제외"
+          ? "서울플랜+ · VWorld 법정 정비구역(UD602) · 경기 1기 신도시 특별정비구역 · 준공·입주·청산 제외"
           : `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
       );
       setPolicyStatus("ready");
@@ -1979,7 +2039,14 @@ export function KakaoMapWorkspace({
     // 공식 사업 위치는 정적 지자체 자료이므로 VWorld 키나 외부 API 장애와 무관하게
     // 표시한다. VWorld가 설정된 경우에만 도시개발·택지개발 폴리곤을 곁들인다.
     const categories: PlanningCategory[] = vworldConfigured
-      ? ["urban-development", "housing-site"]
+      ? [
+          "urban-development",
+          "housing-site",
+          "industrial-complex",
+          "road-plan",
+          "rail-plan",
+          "traffic-plaza"
+        ]
       : [];
 
     planningRequestRef.current?.abort();
@@ -2069,7 +2136,11 @@ export function KakaoMapWorkspace({
       const counts: Record<PlanningCategory, number> = {
         maintenance: 0,
         "urban-development": 0,
-        "housing-site": 0
+        "housing-site": 0,
+        "industrial-complex": 0,
+        "road-plan": 0,
+        "rail-plan": 0,
+        "traffic-plaza": 0
       };
 
       collections.forEach((collection) => {
@@ -2729,7 +2800,7 @@ export function KakaoMapWorkspace({
     0
   ) + maintenancePointCount;
   const planningStatusMessage = {
-    idle: "개발계획 구역과 서울·경기·인천 공식 추진 위치를 표시할 수 있습니다.",
+    idle: "정비·개발·산업단지와 미집행 교통계획을 표시할 수 있습니다.",
     loading: "현재 지도 영역의 개발계획 구역을 불러오는 중입니다.",
     ready:
       planningTotal > 0
@@ -2737,6 +2808,14 @@ export function KakaoMapWorkspace({
             "urban-development"
           ].toLocaleString("ko-KR")} · 택지개발 ${planningCounts[
             "housing-site"
+          ].toLocaleString("ko-KR")} · 산업단지 ${planningCounts[
+            "industrial-complex"
+          ].toLocaleString("ko-KR")} · 간선도로 ${planningCounts[
+            "road-plan"
+          ].toLocaleString("ko-KR")} · 철도 ${planningCounts[
+            "rail-plan"
+          ].toLocaleString("ko-KR")} · 교통광장 ${planningCounts[
+            "traffic-plaza"
           ].toLocaleString("ko-KR")}개를 표시했습니다.${
             planningTruncated ? " 일부 구역은 더 확대해 확인해 주세요." : ""
           }`
@@ -2872,7 +2951,7 @@ export function KakaoMapWorkspace({
             >
               <div className="parcel-detail__header">
                 <div>
-                  <span>선택 개발계획 구역</span>
+                  <span>선택 개발·교통계획 시설</span>
                   <h2>{selectedPlanningZone.projectName}</h2>
                 </div>
                 <span className="parcel-detail__source planning-detail__source">
@@ -3172,8 +3251,9 @@ export function KakaoMapWorkspace({
 
               <p className="parcel-detail__notice">
                 <Info aria-hidden="true" size={15} />
-                국토교통부 VWorld 도시계획 공간정보에서 구역명으로 선별한 자료입니다.
-                사업 단계와 최신 법적 효력은 관할 기관의 고시문을 확인해 주세요.
+                {selectedPlanningZone.sourceName}에서 현재 지도 영역을 조회한 자료입니다.
+                계획시설은 변경·집행될 수 있으므로 최신 법적 효력과 사업 일정은 관할
+                기관의 고시문을 확인해 주세요.
               </p>
             </section>
           ) : null}
@@ -3242,6 +3322,8 @@ export function KakaoMapWorkspace({
                 {selectedPolicyZone.sourceName} ({selectedPolicyZone.sourceLicense}).
                 {selectedPolicyZone.representativeParcelOnly
                   ? " 구역 전체 경계가 아니라 대표 1필지만 표시합니다."
+                  : selectedPolicyZone.geometryNote
+                    ? ` ${selectedPolicyZone.geometryNote}.`
                   : selectedPolicyZone.boundaryKind === "legal"
                     ? selectedPolicyZone.matchMethod === "unmatched"
                       ? " 법정 지정 경계이며 사업현황 명칭·단계는 아직 결합되지 않았습니다."
@@ -3483,7 +3565,7 @@ export function KakaoMapWorkspace({
           >
             <div>
               <MapPin aria-hidden="true" size={18} />
-              <span>정비·개발사업</span>
+              <span>정비·개발·교통계획</span>
             </div>
             <span className="map-layer-preview__status">
               {planningLayerEnabled ? "켜짐" : "꺼짐"}
@@ -3494,6 +3576,10 @@ export function KakaoMapWorkspace({
             <span><i className="planning-legend__swatch planning-legend__swatch--maintenance" />정비사업 위치</span>
             <span><i className="planning-legend__swatch planning-legend__swatch--urban" />도시개발</span>
             <span><i className="planning-legend__swatch planning-legend__swatch--housing" />택지개발</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--industrial" />산업단지</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--road-plan" />미집행·부분집행 간선도로</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--rail-plan" />철도계획시설</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--traffic-plaza" />교통광장·IC</span>
           </div>
 
           <p
@@ -3555,8 +3641,9 @@ export function KakaoMapWorkspace({
             <p className="map-layer-source-note">
               출처: {policySourceNote}. 서울플랜+와 VWorld UD602는 공공누리
               제4유형으로 무료·비상업 서비스에서만 표시하며, 수익화 시 해당 자료를
-              내립니다. 경기 경계는 VWorld UD602의 지정·고시 정비구역이며, 분당 선도지구는
-              노후계획도시 특별법에 따른 성남시 지형도면 고시를 별도로 결합합니다.
+              내립니다. 경기 경계는 VWorld UD602의 지정·고시 정비구역이며, 경기
+              1기 신도시 특별정비구역은 노후계획도시 특별법에 따른 각 시 지형도면
+              고시를 별도로 결합합니다.
               사업명·단계는 공식 현황과 좌표 또는 행정구역·면적으로 연결하며 최신
               내용은 관할 지자체 고시를 확인해 주세요.
             </p>
@@ -3579,8 +3666,9 @@ export function KakaoMapWorkspace({
             <p>
               서울 프로그램 경계와 경기 법정 정비구역은 각각 서울플랜+와 VWorld
               UD602 공간정보를 사용합니다. 두 자료는 공공누리 제4유형이므로 비상업
-              서비스에서만 표시하고, 분당 선도지구는 성남시 특별정비구역 고시를
-              별도로 사용합니다. 집계와 최신 단계는 공식 원문이 기준입니다.
+              서비스에서만 표시하고, 경기 1기 신도시 9곳은 성남·안양·군포·부천시
+              특별정비구역 고시를 별도로 사용합니다. 집계와 최신 단계는 공식 원문이
+              기준입니다.
             </p>
           </section>
 
@@ -3633,9 +3721,9 @@ export function KakaoMapWorkspace({
 
           <div className="map-source-badge">
             {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
-            {planningLayerEnabled ? "개발계획·정비사업 위치 © VWorld·지자체 · " : ""}
+            {planningLayerEnabled ? "정비·개발·산업·교통계획 © VWorld·지자체 · " : ""}
             {policyLayerEnabled
-              ? "정비사업 구역 © 서울특별시 서울플랜+·국토교통부 VWorld·성남시 · "
+              ? "정비사업 구역 © 서울특별시 서울플랜+·국토교통부 VWorld·성남·안양·군포·부천시 · "
               : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao

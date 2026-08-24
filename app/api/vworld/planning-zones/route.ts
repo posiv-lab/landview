@@ -4,22 +4,60 @@ export const runtime = "edge";
 export const preferredRegion = "icn1";
 
 const VWORLD_DATA_URL = "https://api.vworld.kr/req/data";
-const PLANNING_ZONE_LAYER_ID = "LT_C_UPISUQ161";
 const MAX_LONGITUDE_SPAN = 1.5;
 const MAX_LATITUDE_SPAN = 1.5;
 
 const categoryConfig = {
   maintenance: {
     label: "정비구역",
-    keywords: ["정비", "재개발", "재건축"]
+    layerId: "LT_C_UPISUQ161",
+    filters: ["dgm_nm:like:정비", "dgm_nm:like:재개발", "dgm_nm:like:재건축"],
+    sourceName: "국토교통부 VWorld 도시계획 공간정보"
   },
   "urban-development": {
     label: "도시개발구역",
-    keywords: ["도시개발"]
+    layerId: "LT_C_UPISUQ161",
+    filters: ["dgm_nm:like:도시개발"],
+    sourceName: "국토교통부 VWorld 도시계획 공간정보"
   },
   "housing-site": {
     label: "택지개발지구",
-    keywords: ["택지개발"]
+    layerId: "LT_C_UPISUQ161",
+    filters: ["dgm_nm:like:택지개발"],
+    sourceName: "국토교통부 VWorld 도시계획 공간정보"
+  },
+  "industrial-complex": {
+    label: "산업단지",
+    layerId: "LT_C_DAMDAN",
+    filters: [""],
+    sourceName: "국토교통부 VWorld 산업단지 공간정보"
+  },
+  "road-plan": {
+    label: "미집행·부분집행 간선도로",
+    layerId: "LT_C_UPISUQ151",
+    filters: [
+      "excut_se:=:EMA0002|grad_se:like:대로",
+      "excut_se:=:EMA0003|grad_se:like:대로"
+    ],
+    sourceName: "국토교통부 VWorld 도시계획시설(도로)"
+  },
+  "rail-plan": {
+    label: "철도계획시설",
+    layerId: "LT_C_UPISUQ152",
+    filters: [
+      "excut_se:=:EMA0002|lclas_cl:=:UQS500",
+      "excut_se:=:EMA0003|lclas_cl:=:UQS500"
+    ],
+    sourceName: "국토교통부 VWorld 도시계획시설(교통시설)"
+  },
+  "traffic-plaza": {
+    label: "교통광장·IC",
+    layerId: "LT_C_UPISUQ153",
+    filters: [
+      "excut_se:=:EMA0002|lclas_cl:=:UQT100|mlsfc_cl:=:UQT110",
+      "excut_se:=:EMA0003|lclas_cl:=:UQT100|mlsfc_cl:=:UQT110"
+    ],
+    sourceName: "국토교통부 VWorld 도시계획시설(공간시설)"
   }
 } as const;
 
@@ -38,7 +76,7 @@ type SafeFeature = {
     projectName: string;
     projectType: string;
     regionName: string;
-    sourceName: "국토교통부 VWorld 도시계획 공간정보";
+    sourceName: string;
     statusName: string;
   };
   type: "Feature";
@@ -119,16 +157,17 @@ function isPlanningCategory(value: string | null): value is PlanningCategory {
   return Boolean(value && Object.hasOwn(categoryConfig, value));
 }
 
-async function requestKeyword(params: {
+async function requestFeatures(params: {
   apiDomain: string;
   apiKey: string;
   bbox: NonNullable<ReturnType<typeof parseBbox>>;
-  keyword: string;
+  attrFilter: string;
+  layerId: string;
 }) {
   const query = new URLSearchParams({
     service: "data",
     request: "GetFeature",
-    data: PLANNING_ZONE_LAYER_ID,
+    data: params.layerId,
     key: params.apiKey,
     domain: params.apiDomain,
     format: "json",
@@ -137,9 +176,12 @@ async function requestKeyword(params: {
     attribute: "true",
     size: "1000",
     page: "1",
-    geomFilter: `BOX(${params.bbox.minLongitude},${params.bbox.minLatitude},${params.bbox.maxLongitude},${params.bbox.maxLatitude})`,
-    attrFilter: `dgm_nm:like:${params.keyword}`
+    geomFilter: `BOX(${params.bbox.minLongitude},${params.bbox.minLatitude},${params.bbox.maxLongitude},${params.bbox.maxLatitude})`
   });
+
+  if (params.attrFilter) {
+    query.set("attrFilter", params.attrFilter);
+  }
   const response = await fetch(`${VWORLD_DATA_URL}?${query.toString()}`, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(15_000)
@@ -170,6 +212,79 @@ async function requestKeyword(params: {
     features,
     total: Number.isFinite(total) ? total : features.length
   };
+}
+
+function regionName(properties: Record<string, unknown>) {
+  const code = textValue(properties.sig_nam) || textValue(properties.signgu_se).slice(0, 2);
+
+  return code === "11"
+    ? "서울특별시"
+    : code === "28"
+      ? "인천광역시"
+      : code === "41"
+        ? "경기도"
+        : code;
+}
+
+function noticeLabel(properties: Record<string, unknown>) {
+  const value = textValue(properties.ntfc_sn) || textValue(properties.wtnnc_sn);
+  const date = value.match(/(20\d{6})/u)?.[1];
+
+  return date
+    ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+    : textValue(properties.present_sn).slice(-6);
+}
+
+function projectName(category: PlanningCategory, properties: Record<string, unknown>) {
+  if (category === "industrial-complex") {
+    return textValue(properties.dan_name);
+  }
+
+  if (category === "road-plan") {
+    const roadClass = textValue(properties.dgm_nm) || textValue(properties.atr_nam);
+    const roadNumber = textValue(properties.road_no);
+    return `${roadClass}${roadNumber ? `-${roadNumber}호` : ""} 도시계획도로`;
+  }
+
+  if (category === "rail-plan") {
+    const railType =
+      textValue(properties.atr_nam) ||
+      textValue(properties.mls_nam) ||
+      textValue(properties.dgm_nm) ||
+      "철도";
+    return `${railType} 계획${noticeLabel(properties) ? ` · ${noticeLabel(properties)}` : ""}`;
+  }
+
+  if (category === "traffic-plaza") {
+    const plazaType =
+      textValue(properties.scl_nam) !== "미분류"
+        ? textValue(properties.scl_nam)
+        : textValue(properties.dgm_nm) || "교통광장";
+    return `${plazaType} 계획${noticeLabel(properties) ? ` · ${noticeLabel(properties)}` : ""}`;
+  }
+
+  return textValue(properties.dgm_nm);
+}
+
+function classification(category: PlanningCategory, properties: Record<string, unknown>) {
+  if (category === "industrial-complex") {
+    return textValue(properties.cat_nam) || "산업단지";
+  }
+
+  return [
+    properties.lcl_nam,
+    properties.mls_nam,
+    properties.scl_nam,
+    properties.atr_nam,
+    properties.pmi_nam,
+    properties.exc_nam
+  ]
+    .map(textValue)
+    .filter(
+      (value, index, values) =>
+        Boolean(value) && value !== "미분류" && values.indexOf(value) === index
+    )
+    .join(" > ");
 }
 
 export async function GET(request: NextRequest) {
@@ -216,9 +331,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const config = categoryConfig[category];
     const results = await Promise.all(
-      categoryConfig[category].keywords.map((keyword) =>
-        requestKeyword({ apiDomain, apiKey, bbox, keyword })
+      config.filters.map((attrFilter) =>
+        requestFeatures({
+          apiDomain,
+          apiKey,
+          attrFilter,
+          bbox,
+          layerId: config.layerId
+        })
       )
     );
     const featuresById = new Map<string, SafeFeature>();
@@ -234,25 +356,16 @@ export async function GET(request: NextRequest) {
         properties?: Record<string, unknown>;
       };
       const properties = candidate.properties ?? {};
-      const projectName = textValue(properties.dgm_nm);
+      const featureProjectName = projectName(category, properties);
       const id =
+        textValue(properties.dan_id) ||
         textValue(properties.present_sn) ||
         textValue(candidate.id) ||
-        `${category}:${projectName}:${textValue(properties.signgu_se)}`;
+        `${category}:${featureProjectName}:${textValue(properties.signgu_se)}`;
 
-      if (!candidate.geometry || !projectName || featuresById.has(id)) {
+      if (!candidate.geometry || !featureProjectName || featuresById.has(id)) {
         return;
       }
-
-      const classification = [
-        properties.lcl_nam,
-        properties.mls_nam,
-        properties.scl_nam,
-        properties.atr_nam
-      ]
-        .map(textValue)
-        .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
-        .join(" > ");
 
       featuresById.set(id, {
         type: "Feature",
@@ -261,14 +374,17 @@ export async function GET(request: NextRequest) {
         properties: {
           areaSquareMeters: numberValue(properties.dgm_ar),
           category,
-          classification,
+          classification: classification(category, properties),
           districtCode: textValue(properties.signgu_se),
           noticeId: textValue(properties.ntfc_sn) || textValue(properties.wtnnc_sn),
-          programTags: programTags(projectName),
-          projectName,
-          projectType: categoryConfig[category].label,
-          regionName: textValue(properties.sig_nam),
-          sourceName: "국토교통부 VWorld 도시계획 공간정보",
+          programTags: programTags(featureProjectName),
+          projectName: featureProjectName,
+          projectType:
+            category === "industrial-complex"
+              ? textValue(properties.cat_nam) || config.label
+              : config.label,
+          regionName: regionName(properties),
+          sourceName: config.sourceName,
           statusName: textValue(properties.exc_nam)
         }
       });
