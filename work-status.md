@@ -125,4 +125,4 @@ npm run data:bundang-zones
 - GitHub: `origin/main` 푸시 완료
 - Vercel: GitHub 연동 프로덕션 자동 배포 성공
 - 배포 시각: 2026-08-24 23:12 KST
-- 배포 URL: `https://landview-4x92pwetc-posiv-s-projects.vercel.app`
+- 공개 프로덕션 URL: `https://landview.vercel.app`
