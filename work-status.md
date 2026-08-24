@@ -121,4 +121,8 @@ npm run data:bundang-zones
 
 ## 배포 기록
 
-- 이번 변경사항은 커밋·푸시 후 Vercel 프로덕션에 배포한다.
+- 기능 커밋: `50388978e13f269f384081fe5f0186116c9af3b9`
+- GitHub: `origin/main` 푸시 완료
+- Vercel: GitHub 연동 프로덕션 자동 배포 성공
+- 배포 시각: 2026-08-24 23:12 KST
+- 배포 URL: `https://landview-4x92pwetc-posiv-s-projects.vercel.app`
