@@ -19,3 +19,5 @@ pnpm-debug.log*
 __pycache__/
 *.py[cod]
 *.tsbuildinfo
+.tools/
+downloads/

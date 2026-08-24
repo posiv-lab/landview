@@ -173,6 +173,8 @@ type MaintenanceProjectCollection = {
 };
 
 type ProjectZoneCategory =
+  | "legal-zone"
+  | "new-town-special"
   | "fast-track"
   | "moa-town"
   | "redevelopment"
@@ -195,7 +197,11 @@ type ProjectZoneDetail = {
   projectName: string;
   projectType: string;
   regionName: string;
-  // 대표 1필지만 그린 구역(경기 소규모정비)인지 여부
+  boundaryKind?: "legal" | "special-legal" | "programme" | "representative-parcel";
+  matchMethod?: "point" | "area" | "unmatched";
+  reportedAreaSquareMeters?: number | null;
+  showLabel?: boolean;
+  // 이전 경기 소규모정비 대표 필지 자료와의 하위 호환용. 새 레이어에는 사용하지 않는다.
   representativeParcelOnly?: boolean;
   sourceBaseDate: string;
   sourceLicense: string;
@@ -346,6 +352,20 @@ const PROJECT_ZONE_STYLES: Record<
   ProjectZoneCategory,
   typeof DEFAULT_DEVELOPMENT_STYLE
 > = {
+  "legal-zone": {
+    strokeWeight: 3,
+    strokeColor: "#881337",
+    strokeOpacity: 1,
+    fillColor: "#fb7185",
+    fillOpacity: 0.2
+  },
+  "new-town-special": {
+    strokeWeight: 3,
+    strokeColor: "#0f4c5c",
+    strokeOpacity: 1,
+    fillColor: "#22d3ee",
+    fillOpacity: 0.22
+  },
   "fast-track": {
     strokeWeight: 2,
     strokeColor: "#c2410c",
@@ -398,6 +418,8 @@ const PROJECT_ZONE_STYLES: Record<
 };
 
 const EMPTY_ZONE_COUNTS: Record<ProjectZoneCategory, number> = {
+  "legal-zone": 0,
+  "new-town-special": 0,
   "fast-track": 0,
   "moa-town": 0,
   redevelopment: 0,
@@ -410,16 +432,20 @@ const EMPTY_ZONE_COUNTS: Record<ProjectZoneCategory, number> = {
 // 같은 구역이 두 사업유형으로 등록된 경우(예: 재정비촉진구역 + 재개발) 이정표는 하나만
 // 세운다. 숫자가 작을수록 라벨 주인이 될 우선순위가 높다.
 const ZONE_LABEL_PRIORITY: Record<ProjectZoneCategory, number> = {
-  "fast-track": 0,
-  "moa-town": 1,
-  redevelopment: 2,
-  reconstruction: 3,
-  "small-scale": 4,
-  residential: 5,
-  promotion: 6
+  "legal-zone": 0,
+  "new-town-special": 1,
+  "fast-track": 2,
+  "moa-town": 3,
+  redevelopment: 4,
+  reconstruction: 5,
+  "small-scale": 6,
+  residential: 7,
+  promotion: 8
 };
 
 const PROJECT_ZONE_CATEGORY_LABELS: Record<ProjectZoneCategory, string> = {
+  "legal-zone": "법정 정비구역",
+  "new-town-special": "1기 신도시 특별정비",
   "fast-track": "신속통합기획",
   "moa-town": "모아타운",
   redevelopment: "재개발",
@@ -449,6 +475,73 @@ function normalizeZoneName(value: string) {
   }
 
   return text.replace(/[^0-9A-Za-z가-힣]/g, "");
+}
+
+// 원본에는 이미 끝난 사업도 이력 보존 목적으로 남아 있다. 지도는 앞으로의
+// 사업성을 보는 화면이므로 준공(일부)은 유지하고 완전 준공·입주·청산만 제외한다.
+function isCompletedProjectStage(value: string) {
+  const stage = (value ?? "").replace(/\s/g, "");
+
+  if (!stage || stage.includes("일부")) {
+    return false;
+  }
+
+  return /^(?:준공(?:인가|완료)?|입주(?:개시|완료)?|청산|조합해산|해산|사업완료|완료)$/.test(
+    stage
+  );
+}
+
+function projectZoneNameKey(properties: Pick<ProjectZoneDetail, "normalizedName" | "projectName">) {
+  return normalizeZoneName(properties.normalizedName || properties.projectName);
+}
+
+type ProjectLabelAnchor = {
+  key: string;
+  latitude: number;
+  longitude: number;
+};
+
+function collidesWithProjectLabel({
+  anchors,
+  compact,
+  key,
+  latitude,
+  longitude,
+  latitudeSpan,
+  longitudeSpan,
+  viewportHeight,
+  viewportWidth
+}: {
+  anchors: ProjectLabelAnchor[];
+  compact: boolean;
+  key: string;
+  latitude: number;
+  longitude: number;
+  latitudeSpan: number;
+  longitudeSpan: number;
+  viewportHeight: number;
+  viewportWidth: number;
+}) {
+  // 실제 라벨 본문은 사업명과 배지가 합쳐져 최대 210px까지 넓어진다.
+  // 중심점만 96px 띄우면 긴 이름끼리는 여전히 겹치므로 본문 폭·높이를
+  // 포함하는 간격으로 여유 있게 한 개만 남긴다.
+  const horizontalThreshold = compact ? 34 : 160;
+  const verticalThreshold = compact ? 30 : 70;
+
+  return anchors.some((anchor) => {
+    if (key && anchor.key === key) {
+      return true;
+    }
+
+    const horizontalPixels =
+      (Math.abs(anchor.longitude - longitude) / longitudeSpan) * viewportWidth;
+    const verticalPixels =
+      (Math.abs(anchor.latitude - latitude) / latitudeSpan) * viewportHeight;
+
+    return (
+      horizontalPixels < horizontalThreshold && verticalPixels < verticalThreshold
+    );
+  });
 }
 
 function textValue(value: unknown) {
@@ -589,6 +682,16 @@ const OFFICIAL_POLICY_SOURCES = [
     name: "서울플랜+ 통합 공간자료",
     summary: "신속통합·모아타운 포함 원본 공간자료",
     url: "https://data.seoul.go.kr/dataList/OA-22712/F/1/datasetView.do"
+  },
+  {
+    name: "VWorld 법정 정비구역(UD602)",
+    summary: "도시정비법 제16조 지정·고시 경계",
+    url: "https://www.vworld.kr/dtmk/dtmk_ntads_s002.do?svcCde=MK&dsId=30335"
+  },
+  {
+    name: "분당 노후계획도시 특별정비구역",
+    summary: "성남시 선도지구 지정·지형도면 고시",
+    url: "https://www.seongnam.go.kr/pm010301/145352"
   },
   {
     name: "경기도 정비사업 온누리",
@@ -923,6 +1026,7 @@ export function KakaoMapWorkspace({
   const maintenanceMarkersRef = useRef<MaintenanceMarkerEntry[]>([]);
   const policyPolygonsRef = useRef<PlanningPolygonEntry[]>([]);
   const policyMarkersRef = useRef<MaintenanceMarkerEntry[]>([]);
+  const policyLabelAnchorsRef = useRef<ProjectLabelAnchor[]>([]);
   const selectedPolicyPolygonsRef = useRef<KakaoPolygon[]>([]);
   const selectedParcelPolygonsRef = useRef<KakaoPolygon[]>([]);
   const selectedDevelopmentPolygonsRef = useRef<KakaoPolygon[]>([]);
@@ -1166,6 +1270,7 @@ export function KakaoMapWorkspace({
     });
     policyPolygonsRef.current = [];
     policyMarkersRef.current = [];
+    policyLabelAnchorsRef.current = [];
     selectedPolicyPolygonsRef.current = [];
     setPolicyCounts({ ...EMPTY_ZONE_COUNTS });
     setSelectedPolicyZone(null);
@@ -1178,11 +1283,13 @@ export function KakaoMapWorkspace({
     }
 
     if (!policyLoadRef.current) {
-      // 서울(서울플랜+)과 경기 소규모정비(PNU 기준 대표 필지)를 한 레이어로 묶는다.
+      // 서울 프로그램 경계와 경기 법정·노후계획도시 특별정비구역을 한 레이어로 묶는다.
+      // 대표 1필지만 제공하던 경기 소규모정비 파일은 구역 경계로 오인될 수 있어 제외한다.
       policyLoadRef.current = Promise.all(
         [
           { required: true, url: "/data/seoul-project-zones.geojson" },
-          { required: false, url: "/data/gyeonggi-small-scale-zones.geojson" }
+          { required: false, url: "/data/gyeonggi-legal-maintenance-zones.geojson" },
+          { required: false, url: "/data/bundang-special-maintenance-zones.geojson" }
         ].map(async ({ required, url }) => {
           const response = await fetch(url);
 
@@ -1203,16 +1310,22 @@ export function KakaoMapWorkspace({
           );
           // 출처·이용조건이 자료마다 다르므로 각 구역에 함께 새겨 둔다.
           const features = loaded.flatMap((collection) =>
-            collection.features.map((feature) => ({
-              ...feature,
-              properties: {
-                ...feature.properties,
-                sourceBaseDate: collection.metadata.sourceBaseDate,
-                sourceLicense: collection.metadata.sourceLicense,
-                sourceName: collection.metadata.sourceName,
-                sourceUrl: collection.metadata.sourceUrl
-              }
-            }))
+            collection.features
+              .filter(
+                (feature) => !isCompletedProjectStage(feature.properties.stageName)
+              )
+              .map((feature) => ({
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  sourceBaseDate:
+                    feature.properties.sourceBaseDate || collection.metadata.sourceBaseDate,
+                  sourceLicense:
+                    feature.properties.sourceLicense || collection.metadata.sourceLicense,
+                  sourceName: feature.properties.sourceName || collection.metadata.sourceName,
+                  sourceUrl: feature.properties.sourceUrl || collection.metadata.sourceUrl
+                }
+              }))
           );
           const merged: ProjectZoneCollection = {
             features,
@@ -1223,7 +1336,12 @@ export function KakaoMapWorkspace({
 
           policyDataRef.current = merged;
           zoneNameIndexRef.current = new Set(
-            features.map((feature) => feature.properties.normalizedName).filter(Boolean)
+            features.flatMap((feature) => {
+              const canonical = projectZoneNameKey(feature.properties);
+              const projectName = normalizeZoneName(feature.properties.projectName);
+
+              return [canonical, projectName].filter(Boolean);
+            })
           );
           return merged;
         })
@@ -1270,6 +1388,11 @@ export function KakaoMapWorkspace({
       const southWest = bounds.getSouthWest();
       const northEast = bounds.getNorthEast();
       const counts: Record<ProjectZoneCategory, number> = { ...EMPTY_ZONE_COUNTS };
+      const mapElement = mapContainerRef.current;
+      const viewportWidth = Math.max(mapElement?.clientWidth ?? 1, 1);
+      const viewportHeight = Math.max(mapElement?.clientHeight ?? 1, 1);
+      const longitudeSpan = Math.max(northEast.getLng() - southWest.getLng(), 0.000001);
+      const latitudeSpan = Math.max(northEast.getLat() - southWest.getLat(), 0.000001);
 
       const visibleFeatures = collection.features.filter((feature) => {
         const [minLongitude, minLatitude, maxLongitude, maxLatitude] =
@@ -1289,7 +1412,10 @@ export function KakaoMapWorkspace({
           ZONE_LABEL_PRIORITY[left.properties.category] -
           ZONE_LABEL_PRIORITY[right.properties.category]
       );
-      const labelledZoneNames = new Set<string>();
+      // 폴리곤 구역명이 공식 추진 위치 점보다 우선한다. 이 레이어는 자체 라벨만
+      // 충돌 제거하고, 완료 뒤 추진 위치 레이어를 다시 그려 겹치는 점 라벨을 내린다.
+      const labelAnchors: ProjectLabelAnchor[] = [];
+      const policyLabelAnchors: ProjectLabelAnchor[] = [];
 
       visibleFeatures.forEach((feature) => {
         if (!feature.geometry) {
@@ -1380,15 +1506,37 @@ export function KakaoMapWorkspace({
           policyPolygonsRef.current.push({ clickHandler, polygon });
         });
 
-        const zoneKey = feature.properties.normalizedName;
-        const labelPoint = zoneKey && labelledZoneNames.has(zoneKey)
-          ? null
-          : representativePoint(feature.geometry);
+        const zoneKey = `${feature.properties.districtCode}:${projectZoneNameKey(
+          feature.properties
+        )}`;
+        const candidateLabelPoint =
+          feature.properties.showLabel === false
+            ? null
+            : representativePoint(feature.geometry);
+        const labelPoint =
+          candidateLabelPoint &&
+          !collidesWithProjectLabel({
+            anchors: labelAnchors,
+            compact: useCompactPins,
+            key: zoneKey,
+            latitude: candidateLabelPoint.latitude,
+            longitude: candidateLabelPoint.longitude,
+            latitudeSpan,
+            longitudeSpan,
+            viewportHeight,
+            viewportWidth
+          })
+            ? candidateLabelPoint
+            : null;
 
         if (labelPoint) {
-          if (zoneKey) {
-            labelledZoneNames.add(zoneKey);
-          }
+          const labelAnchor = {
+            key: zoneKey,
+            latitude: labelPoint.latitude,
+            longitude: labelPoint.longitude
+          };
+          labelAnchors.push(labelAnchor);
+          policyLabelAnchors.push(labelAnchor);
 
           const labelPosition = new maps.LatLng(
             labelPoint.latitude,
@@ -1424,9 +1572,12 @@ export function KakaoMapWorkspace({
         }
       });
 
+      policyLabelAnchorsRef.current = policyLabelAnchors;
       setPolicyCounts(counts);
       setPolicySourceNote(
-        `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
+        collection.features.some(({ properties }) => properties.boundaryKind === "legal")
+          ? "서울플랜+ · VWorld 법정 정비구역(UD602) · 분당 특별정비구역 · 준공·입주·청산 제외"
+          : `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
       );
       setPolicyStatus("ready");
     } catch (error) {
@@ -1798,12 +1949,6 @@ export function KakaoMapWorkspace({
       return;
     }
 
-    if (!vworldConfigured) {
-      clearPlanningPolygons();
-      setPlanningStatus("not-configured");
-      return;
-    }
-
     if (map.getLevel() > 10) {
       planningRequestRef.current?.abort();
       clearPlanningPolygons();
@@ -1816,17 +1961,26 @@ export function KakaoMapWorkspace({
     const bounds = map.getBounds();
     const southWest = bounds.getSouthWest();
     const northEast = bounds.getNorthEast();
+    const mapElement = mapContainerRef.current;
+    const viewportWidth = Math.max(mapElement?.clientWidth ?? 1, 1);
+    const viewportHeight = Math.max(mapElement?.clientHeight ?? 1, 1);
+    const longitudeSpan = Math.max(northEast.getLng() - southWest.getLng(), 0.000001);
+    const latitudeSpan = Math.max(northEast.getLat() - southWest.getLat(), 0.000001);
+    const labelAnchors: ProjectLabelAnchor[] = [...policyLabelAnchorsRef.current];
+    const planningLabelAnchors: ProjectLabelAnchor[] = [];
     const bbox = [
       southWest.getLng(),
       southWest.getLat(),
       northEast.getLng(),
       northEast.getLat()
     ].join(",");
-    const categories: PlanningCategory[] = [
-      "maintenance",
-      "urban-development",
-      "housing-site"
-    ];
+    // LT_C_UPISUQ161은 지구단위계획구역이다. 이름에 '정비'가 들어간 대상을
+    // 법정 정비구역으로 오인하지 않도록 maintenance 요청은 하지 않는다.
+    // 공식 사업 위치는 정적 지자체 자료이므로 VWorld 키나 외부 API 장애와 무관하게
+    // 표시한다. VWorld가 설정된 경우에만 도시개발·택지개발 폴리곤을 곁들인다.
+    const categories: PlanningCategory[] = vworldConfigured
+      ? ["urban-development", "housing-site"]
+      : [];
 
     planningRequestRef.current?.abort();
     const controller = new AbortController();
@@ -1854,12 +2008,14 @@ export function KakaoMapWorkspace({
               { signal: controller.signal }
             );
 
-            if (response.status === 503) {
-              throw new Error("VWORLD_NOT_CONFIGURED");
-            }
-
             if (!response.ok) {
-              throw new Error("PLANNING_ZONES_REQUEST_FAILED");
+              return {
+                category,
+                features: [],
+                total: 0,
+                truncated: false,
+                type: "FeatureCollection"
+              } satisfies PlanningFeatureCollection;
             }
 
             return (await response.json()) as PlanningFeatureCollection;
@@ -1893,13 +2049,13 @@ export function KakaoMapWorkspace({
             )
           ).filter((value): value is MaintenanceProjectCollection => value !== null);
           const collection: MaintenanceProjectCollection = {
-            projects: sourceCollections.flatMap(({ projects }) => projects),
-            total: sourceCollections.reduce(
-              (total, sourceCollection) => total + sourceCollection.total,
-              0
-            ),
+            projects: sourceCollections
+              .flatMap(({ projects }) => projects)
+              .filter((project) => !isCompletedProjectStage(project.businessStage)),
+            total: 0,
             type: "LandViewMaintenanceProjectCollection"
           };
+          collection.total = collection.projects.length;
           maintenanceDataRef.current = collection;
           return collection;
         })()
@@ -2011,16 +2167,37 @@ export function KakaoMapWorkspace({
 
           // 구역 위에 공식 사업명·사업유형 이정표를 세운다.
           // 서울 정비사업 레이어가 같은 구역에 이미 이정표를 세웠다면 건너뛴다.
+          const zoneKey = normalizeZoneName(feature.properties.projectName);
           const alreadyLabelled =
             policyLayerEnabledRef.current &&
-            zoneNameIndexRef.current.has(
-              normalizeZoneName(feature.properties.projectName)
-            );
-          const labelPoint = alreadyLabelled
+            zoneNameIndexRef.current.has(zoneKey);
+          const candidateLabelPoint = alreadyLabelled
             ? null
             : representativePoint(feature.geometry);
+          const labelPoint =
+            candidateLabelPoint &&
+            !collidesWithProjectLabel({
+              anchors: labelAnchors,
+              compact: useCompactPins,
+              key: zoneKey,
+              latitude: candidateLabelPoint.latitude,
+              longitude: candidateLabelPoint.longitude,
+              latitudeSpan,
+              longitudeSpan,
+              viewportHeight,
+              viewportWidth
+            })
+              ? candidateLabelPoint
+              : null;
 
           if (labelPoint) {
+            const labelAnchor = {
+              key: zoneKey,
+              latitude: labelPoint.latitude,
+              longitude: labelPoint.longitude
+            };
+            labelAnchors.push(labelAnchor);
+            planningLabelAnchors.push(labelAnchor);
             const labelPosition = new maps.LatLng(
               labelPoint.latitude,
               labelPoint.longitude
@@ -2059,6 +2236,7 @@ export function KakaoMapWorkspace({
 
       const visibleMaintenanceProjects = maintenanceCollection.projects.filter(
         (project) =>
+          !isCompletedProjectStage(project.businessStage) &&
           project.center &&
           project.center.longitude >= southWest.getLng() &&
           project.center.longitude <= northEast.getLng() &&
@@ -2079,6 +2257,31 @@ export function KakaoMapWorkspace({
         if (!project.center) {
           return;
         }
+
+        const projectKey = normalizeZoneName(project.projectName);
+        if (
+          collidesWithProjectLabel({
+            anchors: labelAnchors,
+            compact: useCompactPins,
+            key: projectKey,
+            latitude: project.center.latitude,
+            longitude: project.center.longitude,
+            latitudeSpan,
+            longitudeSpan,
+            viewportHeight,
+            viewportWidth
+          })
+        ) {
+          return;
+        }
+
+        const labelAnchor = {
+          key: projectKey,
+          latitude: project.center.latitude,
+          longitude: project.center.longitude
+        };
+        labelAnchors.push(labelAnchor);
+        planningLabelAnchors.push(labelAnchor);
 
         const position = new maps.LatLng(
           project.center.latitude,
@@ -2526,11 +2729,11 @@ export function KakaoMapWorkspace({
     0
   ) + maintenancePointCount;
   const planningStatusMessage = {
-    idle: "정비·개발사업 구역과 서울·인천 공식 추진현황을 표시할 수 있습니다.",
+    idle: "개발계획 구역과 서울·경기·인천 공식 추진 위치를 표시할 수 있습니다.",
     loading: "현재 지도 영역의 개발계획 구역을 불러오는 중입니다.",
     ready:
       planningTotal > 0
-        ? `정비경계 ${planningCounts.maintenance.toLocaleString("ko-KR")} · 공식 추진현황 ${maintenancePointCount.toLocaleString("ko-KR")} · 도시개발 ${planningCounts[
+        ? `공식 추진 위치 ${maintenancePointCount.toLocaleString("ko-KR")} · 도시개발 ${planningCounts[
             "urban-development"
           ].toLocaleString("ko-KR")} · 택지개발 ${planningCounts[
             "housing-site"
@@ -2547,12 +2750,14 @@ export function KakaoMapWorkspace({
     0
   );
   const policyStatusMessage = {
-    idle: "서울 재개발·재건축·신속통합·모아타운과 경기 소규모정비 구역을 표시할 수 있습니다.",
+    idle: "서울 정비사업 공간정보와 경기 법정 정비구역을 표시할 수 있습니다.",
     loading: "현재 지도 영역의 정비사업 구역을 불러오는 중입니다.",
     ready:
       policyTotal > 0
         ? `${(
             [
+              "legal-zone",
+              "new-town-special",
               "redevelopment",
               "reconstruction",
               "fast-track",
@@ -3037,7 +3242,13 @@ export function KakaoMapWorkspace({
                 {selectedPolicyZone.sourceName} ({selectedPolicyZone.sourceLicense}).
                 {selectedPolicyZone.representativeParcelOnly
                   ? " 구역 전체 경계가 아니라 대표 1필지만 표시합니다."
-                  : ""}{" "}
+                  : selectedPolicyZone.boundaryKind === "legal"
+                    ? selectedPolicyZone.matchMethod === "unmatched"
+                      ? " 법정 지정 경계이며 사업현황 명칭·단계는 아직 결합되지 않았습니다."
+                      : ` 법정 지정 경계이며 사업현황은 ${
+                          selectedPolicyZone.matchMethod === "point" ? "좌표" : "행정구역·면적"
+                        }으로 결합했습니다.`
+                    : ""}{" "}
                 법적 효력이 없는 참고 자료이며, 최신 추진 단계는 관할 지자체 고시를
                 확인해 주세요.
               </p>
@@ -3280,7 +3491,7 @@ export function KakaoMapWorkspace({
           </button>
 
           <div aria-label="개발계획 구역 색상" className="planning-legend">
-            <span><i className="planning-legend__swatch planning-legend__swatch--maintenance" />정비 구역·위치</span>
+            <span><i className="planning-legend__swatch planning-legend__swatch--maintenance" />정비사업 위치</span>
             <span><i className="planning-legend__swatch planning-legend__swatch--urban" />도시개발</span>
             <span><i className="planning-legend__swatch planning-legend__swatch--housing" />택지개발</span>
           </div>
@@ -3313,6 +3524,8 @@ export function KakaoMapWorkspace({
           <div aria-label="정비사업 구역 색상" className="planning-legend">
             {(
               [
+                "legal-zone",
+                "new-town-special",
                 "redevelopment",
                 "reconstruction",
                 "fast-track",
@@ -3340,11 +3553,12 @@ export function KakaoMapWorkspace({
 
           {policySourceNote ? (
             <p className="map-layer-source-note">
-              출처: 서울 구역은 {policySourceNote}(공공누리 제4유형)로 비상업 목적의
-              지도 표시에만 사용합니다. 경기 소규모정비 구역은 경기부동산포털 자료의
-              필지고유번호로 연속지적도에서 대표 1필지만 표시하며, 구역 전체 경계가
-              아닙니다. 모두 법적 효력이 없는 참고 자료이니 최신 내용은 공식 원문으로
-              확인해 주세요.
+              출처: {policySourceNote}. 서울플랜+와 VWorld UD602는 공공누리
+              제4유형으로 무료·비상업 서비스에서만 표시하며, 수익화 시 해당 자료를
+              내립니다. 경기 경계는 VWorld UD602의 지정·고시 정비구역이며, 분당 선도지구는
+              노후계획도시 특별법에 따른 성남시 지형도면 고시를 별도로 결합합니다.
+              사업명·단계는 공식 현황과 좌표 또는 행정구역·면적으로 연결하며 최신
+              내용은 관할 지자체 고시를 확인해 주세요.
             </p>
           ) : null}
 
@@ -3363,9 +3577,10 @@ export function KakaoMapWorkspace({
               ))}
             </div>
             <p>
-              서울 정비사업 구역(재개발·재건축·신속통합기획·모아타운 등)은 서울플랜+
-              공간정보(공공누리 제4유형)를 비상업 목적으로 지도에 표시합니다. 집계
-              건수와 최신 단계는 위 공식 원문이 기준이며, 지도 표시는 참고 자료입니다.
+              서울 프로그램 경계와 경기 법정 정비구역은 각각 서울플랜+와 VWorld
+              UD602 공간정보를 사용합니다. 두 자료는 공공누리 제4유형이므로 비상업
+              서비스에서만 표시하고, 분당 선도지구는 성남시 특별정비구역 고시를
+              별도로 사용합니다. 집계와 최신 단계는 공식 원문이 기준입니다.
             </p>
           </section>
 
@@ -3418,8 +3633,10 @@ export function KakaoMapWorkspace({
 
           <div className="map-source-badge">
             {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
-            {planningLayerEnabled ? "정비·개발계획 © VWorld · " : ""}
-            {policyLayerEnabled ? "정비사업 구역 © 서울특별시 서울플랜+ · 경기도 · " : ""}
+            {planningLayerEnabled ? "개발계획·정비사업 위치 © VWorld·지자체 · " : ""}
+            {policyLayerEnabled
+              ? "정비사업 구역 © 서울특별시 서울플랜+·국토교통부 VWorld·성남시 · "
+              : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao
           </div>

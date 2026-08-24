@@ -186,6 +186,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // LT_C_UPISUQ161 is a district-unit planning layer, not the legal maintenance
+  // district dataset (UD602). Never return name-filtered UQ161 features as legal
+  // maintenance boundaries.
+  if (category === "maintenance") {
+    return NextResponse.json(
+      {
+        type: "FeatureCollection",
+        category,
+        features: [],
+        total: 0,
+        truncated: false
+      },
+      { headers: { "Cache-Control": "public, s-maxage=3600" } }
+    );
+  }
+
   const apiKey = process.env.VWORLD_API_KEY?.trim();
   const apiDomain = process.env.VWORLD_DOMAIN?.trim();
 
