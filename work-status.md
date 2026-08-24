@@ -141,6 +141,17 @@ npm run data:gyeonggi-zone-labels
 
 ## 배포 기록
 
+### 2026-08-25 경기 레이어 확장
+
+- 기능 커밋: `467bffc` (`feat: expand Gyeonggi development layers`)
+- GitHub: `origin/main` 푸시 완료
+- Vercel: GitHub 연동 프로덕션 자동 배포 성공
+- 운영 검증: 특별정비구역 9건과 VWorld 도시개발·택지개발·산업단지·간선도로·철도·교통광장 6종 응답 확인
+- 검증 시각: 2026-08-25 08:20 KST
+- 공개 프로덕션 URL: `https://landview.vercel.app`
+
+### 2026-08-24 경기 법정 정비구역
+
 - 기능 커밋: `50388978e13f269f384081fe5f0186116c9af3b9`
 - GitHub: `origin/main` 푸시 완료
 - Vercel: GitHub 연동 프로덕션 자동 배포 성공
