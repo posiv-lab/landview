@@ -172,33 +172,44 @@ type MaintenanceProjectCollection = {
   type: "LandViewMaintenanceProjectCollection";
 };
 
-type PolicyProgramme = "신속통합기획" | "모아타운";
+type ProjectZoneCategory =
+  | "fast-track"
+  | "moa-town"
+  | "redevelopment"
+  | "reconstruction"
+  | "small-scale"
+  | "promotion"
+  | "residential";
 
-type PolicyZoneDetail = {
+type ProjectZoneDetail = {
   areaSquareMeters: number | null;
   bounds: [number, number, number, number];
+  category: ProjectZoneCategory;
   districtCode: string;
   districtName: string;
   noticeDate: string;
+  normalizedName: string;
+  partCount: number;
   programTags: string[];
   projectName: string;
-  projectType: PolicyProgramme;
+  projectType: string;
   regionName: string;
-  sourceBaseDate: string;
-  sourceLicense: string;
-  sourceName: string;
-  sourceUrl: string;
   stageName: string;
 };
 
-type PolicyZoneCollection = {
+type ProjectZoneCollection = {
   features: Array<{
     geometry: PolygonGeometry | MultiPolygonGeometry | null;
     id: string;
-    properties: PolicyZoneDetail;
+    properties: ProjectZoneDetail;
     type: "Feature";
   }>;
-  metadata: { sourceBaseDate: string; sourceLicense: string; sourceName: string };
+  metadata: {
+    sourceBaseDate: string;
+    sourceLicense: string;
+    sourceName: string;
+    sourceUrl: string;
+  };
   total: number;
   type: "FeatureCollection";
 };
@@ -323,23 +334,115 @@ const SELECTED_PLANNING_STYLE = {
   fillOpacity: 0.3
 };
 
-// 서울시 정책사업 구역 — 신속통합기획/모아타운을 서로 다른 색으로 구분한다.
-const POLICY_ZONE_STYLES: Record<PolicyProgramme, typeof DEFAULT_DEVELOPMENT_STYLE> = {
-  신속통합기획: {
+// 서울 정비사업 구역 — 사업 갈래별로 색을 나눈다.
+const PROJECT_ZONE_STYLES: Record<
+  ProjectZoneCategory,
+  typeof DEFAULT_DEVELOPMENT_STYLE
+> = {
+  "fast-track": {
     strokeWeight: 2,
     strokeColor: "#c2410c",
     strokeOpacity: 0.95,
     fillColor: "#fb923c",
     fillOpacity: 0.18
   },
-  모아타운: {
+  "moa-town": {
     strokeWeight: 2,
     strokeColor: "#7e22ce",
     strokeOpacity: 0.95,
     fillColor: "#c084fc",
     fillOpacity: 0.18
+  },
+  redevelopment: {
+    strokeWeight: 2,
+    strokeColor: "#b91c1c",
+    strokeOpacity: 0.95,
+    fillColor: "#f87171",
+    fillOpacity: 0.18
+  },
+  reconstruction: {
+    strokeWeight: 2,
+    strokeColor: "#1d4ed8",
+    strokeOpacity: 0.95,
+    fillColor: "#60a5fa",
+    fillOpacity: 0.18
+  },
+  "small-scale": {
+    strokeWeight: 2,
+    strokeColor: "#047857",
+    strokeOpacity: 0.9,
+    fillColor: "#34d399",
+    fillOpacity: 0.16
+  },
+  promotion: {
+    strokeWeight: 2,
+    strokeColor: "#a16207",
+    strokeOpacity: 0.9,
+    fillColor: "#fbbf24",
+    fillOpacity: 0.16
+  },
+  residential: {
+    strokeWeight: 2,
+    strokeColor: "#4338ca",
+    strokeOpacity: 0.9,
+    fillColor: "#a5b4fc",
+    fillOpacity: 0.16
   }
 };
+
+const EMPTY_ZONE_COUNTS: Record<ProjectZoneCategory, number> = {
+  "fast-track": 0,
+  "moa-town": 0,
+  redevelopment: 0,
+  reconstruction: 0,
+  "small-scale": 0,
+  promotion: 0,
+  residential: 0
+};
+
+// 같은 구역이 두 사업유형으로 등록된 경우(예: 재정비촉진구역 + 재개발) 이정표는 하나만
+// 세운다. 숫자가 작을수록 라벨 주인이 될 우선순위가 높다.
+const ZONE_LABEL_PRIORITY: Record<ProjectZoneCategory, number> = {
+  "fast-track": 0,
+  "moa-town": 1,
+  redevelopment: 2,
+  reconstruction: 3,
+  "small-scale": 4,
+  residential: 5,
+  promotion: 6
+};
+
+const PROJECT_ZONE_CATEGORY_LABELS: Record<ProjectZoneCategory, string> = {
+  "fast-track": "신속통합기획",
+  "moa-town": "모아타운",
+  redevelopment: "재개발",
+  reconstruction: "재건축",
+  "small-scale": "소규모정비",
+  promotion: "재정비촉진",
+  residential: "주거환경개선"
+};
+
+// 라벨 중복 판정을 위한 이름 정규화. 변환 스크립트의 normalized_name과 같은 규칙이다.
+// "북아현3 재정비촉진구역 지구단위계획구역"처럼 접미사가 겹쳐 붙은 이름이 있어
+// 더 이상 줄지 않을 때까지 반복해서 떼어낸다.
+const ZONE_NAME_SUFFIX =
+  /(?:주택정비형|도시정비형|소규모|가로주택|주택)?(?:재개발|재건축)?(?:재정비촉진|정비사업|정비구역|지구단위계획구역|지구단위계획|사업)?(?:구역|지구)$/;
+
+function normalizeZoneName(value: string) {
+  let text = (value ?? "").replace(/\([^)]*\)/g, "").replace(/\s/g, "");
+
+  for (let index = 0; index < 4; index += 1) {
+    const next = text.replace(ZONE_NAME_SUFFIX, "");
+
+    if (next === text) {
+      break;
+    }
+
+    text = next;
+  }
+
+  return text.replace(/[^0-9A-Za-z가-힣]/g, "");
+}
 
 function textValue(value: unknown) {
   if (typeof value === "string") {
@@ -822,7 +925,11 @@ export function KakaoMapWorkspace({
   const developmentDataRef = useRef<DevelopmentFeatureCollection | null>(null);
   const planningRequestRef = useRef<AbortController | null>(null);
   const policyRequestRef = useRef<AbortController | null>(null);
-  const policyDataRef = useRef<PolicyZoneCollection | null>(null);
+  const policyDataRef = useRef<ProjectZoneCollection | null>(null);
+  // 서울 정비사업 구역이 이미 이정표를 세운 구역 이름. 포인트·VWorld 라벨 중복을 막는다.
+  const zoneNameIndexRef = useRef<Set<string>>(new Set());
+  // 구역 자료가 도착하기 전에 다른 레이어가 라벨을 그려 중복이 생기지 않도록 공유하는 로딩 약속.
+  const policyLoadRef = useRef<Promise<ProjectZoneCollection> | null>(null);
   const maintenanceMatchRequestRef = useRef<AbortController | null>(null);
   const maintenanceDataRef = useRef<MaintenanceProjectCollection | null>(null);
   const landLedgerRequestRef = useRef<AbortController | null>(null);
@@ -846,12 +953,14 @@ export function KakaoMapWorkspace({
   const [planningLayerEnabled, setPlanningLayerEnabled] = useState(false);
   const [policyLayerEnabled, setPolicyLayerEnabled] = useState(false);
   const [policyStatus, setPolicyStatus] = useState<PolicyStatus>("idle");
-  const [policyCounts, setPolicyCounts] = useState<Record<PolicyProgramme, number>>({
-    신속통합기획: 0,
-    모아타운: 0
-  });
+  const [policyCounts, setPolicyCounts] = useState<Record<ProjectZoneCategory, number>>(
+    () => ({ ...EMPTY_ZONE_COUNTS })
+  );
   const [policySourceNote, setPolicySourceNote] = useState("");
-  const [selectedPolicyZone, setSelectedPolicyZone] = useState<PolicyZoneDetail | null>(
+  const [policySource, setPolicySource] = useState<
+    ProjectZoneCollection["metadata"] | null
+  >(null);
+  const [selectedPolicyZone, setSelectedPolicyZone] = useState<ProjectZoneDetail | null>(
     null
   );
   const [parcelStatus, setParcelStatus] = useState<ParcelStatus>("idle");
@@ -1054,8 +1163,41 @@ export function KakaoMapWorkspace({
     policyPolygonsRef.current = [];
     policyMarkersRef.current = [];
     selectedPolicyPolygonsRef.current = [];
-    setPolicyCounts({ 신속통합기획: 0, 모아타운: 0 });
+    setPolicyCounts({ ...EMPTY_ZONE_COUNTS });
     setSelectedPolicyZone(null);
+  }, []);
+
+  // 구역 자료는 한 번만 받아 캐시하고, 동시에 여러 레이어가 요청하면 같은 약속을 공유한다.
+  const loadProjectZones = useCallback(() => {
+    if (policyDataRef.current) {
+      return Promise.resolve(policyDataRef.current);
+    }
+
+    if (!policyLoadRef.current) {
+      policyLoadRef.current = fetch("/data/seoul-project-zones.geojson")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("PROJECT_ZONES_REQUEST_FAILED");
+          }
+
+          return response.json() as Promise<ProjectZoneCollection>;
+        })
+        .then((collection) => {
+          policyDataRef.current = collection;
+          zoneNameIndexRef.current = new Set(
+            collection.features
+              .map((feature) => feature.properties.normalizedName)
+              .filter(Boolean)
+          );
+          return collection;
+        })
+        .catch((error) => {
+          policyLoadRef.current = null;
+          throw error;
+        });
+    }
+
+    return policyLoadRef.current;
   }, []);
 
   const refreshPolicyZones = useCallback(async () => {
@@ -1079,20 +1221,7 @@ export function KakaoMapWorkspace({
     setPolicyStatus("loading");
 
     try {
-      let collection = policyDataRef.current;
-
-      if (!collection) {
-        const response = await fetch("/data/seoul-policy-zones.geojson", {
-          signal: controller.signal
-        });
-
-        if (!response.ok) {
-          throw new Error("POLICY_ZONES_REQUEST_FAILED");
-        }
-
-        collection = (await response.json()) as PolicyZoneCollection;
-        policyDataRef.current = collection;
-      }
+      const collection = await loadProjectZones();
 
       if (controller.signal.aborted) {
         return;
@@ -1104,10 +1233,7 @@ export function KakaoMapWorkspace({
       const bounds = map.getBounds();
       const southWest = bounds.getSouthWest();
       const northEast = bounds.getNorthEast();
-      const counts: Record<PolicyProgramme, number> = {
-        신속통합기획: 0,
-        모아타운: 0
-      };
+      const counts: Record<ProjectZoneCategory, number> = { ...EMPTY_ZONE_COUNTS };
 
       const visibleFeatures = collection.features.filter((feature) => {
         const [minLongitude, minLatitude, maxLongitude, maxLatitude] =
@@ -1121,12 +1247,20 @@ export function KakaoMapWorkspace({
         );
       });
 
+      // 같은 구역이 여러 사업유형으로 잡히면 우선순위가 높은 쪽만 이정표를 갖는다.
+      visibleFeatures.sort(
+        (left, right) =>
+          ZONE_LABEL_PRIORITY[left.properties.category] -
+          ZONE_LABEL_PRIORITY[right.properties.category]
+      );
+      const labelledZoneNames = new Set<string>();
+
       visibleFeatures.forEach((feature) => {
         if (!feature.geometry) {
           return;
         }
 
-        const programme = feature.properties.projectType;
+        const category = feature.properties.category;
         const featurePolygons: KakaoPolygon[] = [];
         const polygons =
           feature.geometry.type === "Polygon"
@@ -1155,11 +1289,11 @@ export function KakaoMapWorkspace({
             map,
             path: paths.length === 1 ? paths[0] : paths,
             strokeStyle: "solid",
-            ...POLICY_ZONE_STYLES[programme]
+            ...PROJECT_ZONE_STYLES[category]
           });
           (
-            polygon as KakaoPolygon & { policyProgramme?: PolicyProgramme }
-          ).policyProgramme = programme;
+            polygon as KakaoPolygon & { zoneCategory?: ProjectZoneCategory }
+          ).zoneCategory = category;
           featurePolygons.push(polygon);
         });
 
@@ -1167,7 +1301,7 @@ export function KakaoMapWorkspace({
           return;
         }
 
-        counts[programme] += 1;
+        counts[category] += 1;
 
         const selectZone = (latLng: KakaoLatLng) => {
           parcelClickGuardRef.current = true;
@@ -1176,10 +1310,10 @@ export function KakaoMapWorkspace({
 
           selectedPolicyPolygonsRef.current.forEach((polygon) => {
             const previous = (
-              polygon as KakaoPolygon & { policyProgramme?: PolicyProgramme }
-            ).policyProgramme;
+              polygon as KakaoPolygon & { zoneCategory?: ProjectZoneCategory }
+            ).zoneCategory;
             polygon.setOptions(
-              previous ? POLICY_ZONE_STYLES[previous] : POLICY_ZONE_STYLES.모아타운
+              previous ? PROJECT_ZONE_STYLES[previous] : PROJECT_ZONE_STYLES.redevelopment
             );
           });
           featurePolygons.forEach((polygon) => {
@@ -1192,7 +1326,7 @@ export function KakaoMapWorkspace({
           setSelectedCoordinates(
             `${latLng.getLat().toFixed(6)}, ${latLng.getLng().toFixed(6)}`
           );
-          setSearchMessage(`${programme} 구역을 선택했습니다.`);
+          setSearchMessage(`${feature.properties.projectType} 구역을 선택했습니다.`);
           moveMarker(latLng);
 
           window.requestAnimationFrame(() => {
@@ -1210,9 +1344,16 @@ export function KakaoMapWorkspace({
           policyPolygonsRef.current.push({ clickHandler, polygon });
         });
 
-        const labelPoint = representativePoint(feature.geometry);
+        const zoneKey = feature.properties.normalizedName;
+        const labelPoint = zoneKey && labelledZoneNames.has(zoneKey)
+          ? null
+          : representativePoint(feature.geometry);
 
         if (labelPoint) {
+          if (zoneKey) {
+            labelledZoneNames.add(zoneKey);
+          }
+
           const labelPosition = new maps.LatLng(
             labelPoint.latitude,
             labelPoint.longitude
@@ -1251,6 +1392,7 @@ export function KakaoMapWorkspace({
       setPolicySourceNote(
         `${collection.metadata.sourceName} · ${collection.metadata.sourceBaseDate} 기준`
       );
+      setPolicySource(collection.metadata);
       setPolicyStatus("ready");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -1260,7 +1402,12 @@ export function KakaoMapWorkspace({
       clearPolicyZones();
       setPolicyStatus("error");
     }
-  }, [clearPolicyZones, clearSelectedDevelopmentProject, clearSelectedParcel]);
+  }, [
+    clearPolicyZones,
+    clearSelectedDevelopmentProject,
+    clearSelectedParcel,
+    loadProjectZones
+  ]);
 
   const refreshParcels = useCallback(async () => {
     const maps = mapsApiRef.current;
@@ -1652,6 +1799,16 @@ export function KakaoMapWorkspace({
     setPlanningStatus("loading");
 
     try {
+      // 서울 정비사업 구역이 켜져 있으면 그 이름 색인이 준비된 뒤에 라벨을 그린다.
+      // 그러지 않으면 첫 로딩에서 같은 구역에 이정표가 두 번 세워진다.
+      if (policyLayerEnabledRef.current) {
+        await loadProjectZones().catch(() => undefined);
+
+        if (controller.signal.aborted) {
+          return;
+        }
+      }
+
       const [collections, maintenanceCollection] = await Promise.all([
         Promise.all(
           categories.map(async (category) => {
@@ -1678,22 +1835,28 @@ export function KakaoMapWorkspace({
             return maintenanceDataRef.current;
           }
 
-          const responses = await Promise.all(
-            [
-              "/data/seoul-maintenance-projects.json",
-              "/data/incheon-maintenance-projects.json"
-            ].map((url) => fetch(url, { signal: controller.signal }))
-          );
-          if (responses.some((response) => !response.ok)) {
-            throw new Error("MAINTENANCE_DATA_REQUEST_FAILED");
-          }
+          // 경기 자료는 인증키로 새로 받아야 하므로 아직 없을 수 있다. 없으면 건너뛴다.
+          const sourceCollections = (
+            await Promise.all(
+              [
+                "/data/seoul-maintenance-projects.json",
+                "/data/incheon-maintenance-projects.json",
+                "/data/gyeonggi-maintenance-projects.json"
+              ].map(async (url) => {
+                const response = await fetch(url, { signal: controller.signal });
 
-          const sourceCollections = await Promise.all(
-            responses.map(
-              async (response) =>
-                (await response.json()) as MaintenanceProjectCollection
+                if (!response.ok) {
+                  if (url.includes("gyeonggi")) {
+                    return null;
+                  }
+
+                  throw new Error("MAINTENANCE_DATA_REQUEST_FAILED");
+                }
+
+                return (await response.json()) as MaintenanceProjectCollection;
+              })
             )
-          );
+          ).filter((value): value is MaintenanceProjectCollection => value !== null);
           const collection: MaintenanceProjectCollection = {
             projects: sourceCollections.flatMap(({ projects }) => projects),
             total: sourceCollections.reduce(
@@ -1812,7 +1975,15 @@ export function KakaoMapWorkspace({
           });
 
           // 구역 위에 공식 사업명·사업유형 이정표를 세운다.
-          const labelPoint = representativePoint(feature.geometry);
+          // 서울 정비사업 레이어가 같은 구역에 이미 이정표를 세웠다면 건너뛴다.
+          const alreadyLabelled =
+            policyLayerEnabledRef.current &&
+            zoneNameIndexRef.current.has(
+              normalizeZoneName(feature.properties.projectName)
+            );
+          const labelPoint = alreadyLabelled
+            ? null
+            : representativePoint(feature.geometry);
 
           if (labelPoint) {
             const labelPosition = new maps.LatLng(
@@ -1860,7 +2031,16 @@ export function KakaoMapWorkspace({
           project.center.latitude <= northEast.getLat()
       );
 
-      visibleMaintenanceProjects.forEach((project) => {
+      // 서울 정비사업 구역 레이어가 같은 구역을 이미 그렸다면 점 이정표를 겹쳐 세우지 않는다.
+      const unlabelledMaintenanceProjects = visibleMaintenanceProjects.filter(
+        (project) =>
+          !(
+            policyLayerEnabledRef.current &&
+            zoneNameIndexRef.current.has(normalizeZoneName(project.projectName))
+          )
+      );
+
+      unlabelledMaintenanceProjects.forEach((project) => {
         if (!project.center) {
           return;
         }
@@ -1947,7 +2127,7 @@ export function KakaoMapWorkspace({
       });
 
       setPlanningCounts(counts);
-      setMaintenancePointCount(visibleMaintenanceProjects.length);
+      setMaintenancePointCount(unlabelledMaintenanceProjects.length);
       setPlanningTruncated(collections.some((collection) => collection.truncated));
       setPlanningStatus("ready");
     } catch (error) {
@@ -1967,6 +2147,7 @@ export function KakaoMapWorkspace({
     clearSelectedDevelopmentProject,
     clearSelectedParcel,
     loadMaintenanceProjectDetail,
+    loadProjectZones,
     vworldConfigured
   ]);
 
@@ -2231,10 +2412,15 @@ export function KakaoMapWorkspace({
       policyRequestRef.current?.abort();
       clearPolicyZones();
       setPolicyStatus("idle");
+      // 중복 억제가 풀렸으니 가려져 있던 이정표를 되살린다.
+      void refreshPlanningZones();
       return;
     }
 
-    void refreshPolicyZones();
+    void refreshPolicyZones().then(() => {
+      // 이 레이어가 세운 이정표와 겹치는 라벨을 정리한다.
+      void refreshPlanningZones();
+    });
   }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -2321,16 +2507,37 @@ export function KakaoMapWorkspace({
     "not-configured": "VWorld API 키와 등록 도메인 설정이 필요합니다.",
     error: "정비·개발계획 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<PlanningStatus, string>;
-  const policyTotal = policyCounts.신속통합기획 + policyCounts.모아타운;
+  const policyTotal = Object.values(policyCounts).reduce(
+    (total, count) => total + count,
+    0
+  );
   const policyStatusMessage = {
-    idle: "서울시 신속통합기획·모아타운 구역을 표시할 수 있습니다.",
-    loading: "현재 지도 영역의 정책사업 구역을 불러오는 중입니다.",
+    idle: "서울시 재개발·재건축·신속통합·모아타운 구역을 표시할 수 있습니다.",
+    loading: "현재 지도 영역의 정비사업 구역을 불러오는 중입니다.",
     ready:
       policyTotal > 0
-        ? `신속통합기획 ${policyCounts.신속통합기획.toLocaleString("ko-KR")} · 모아타운 ${policyCounts.모아타운.toLocaleString("ko-KR")}개를 표시했습니다.`
-        : "현재 영역에서 신속통합기획·모아타운 구역을 찾지 못했습니다.",
-    "zoom-in": "서울 지역을 더 확대하면 신속통합기획·모아타운 구역이 표시됩니다.",
-    error: "정책사업 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+        ? `${(
+            [
+              "redevelopment",
+              "reconstruction",
+              "fast-track",
+              "moa-town",
+              "small-scale",
+              "promotion",
+              "residential"
+            ] as ProjectZoneCategory[]
+          )
+            .filter((category) => policyCounts[category] > 0)
+            .map(
+              (category) =>
+                `${PROJECT_ZONE_CATEGORY_LABELS[category]} ${policyCounts[
+                  category
+                ].toLocaleString("ko-KR")}`
+            )
+            .join(" · ")}개 구역을 표시했습니다.`
+        : "현재 영역에서 서울 정비사업 구역을 찾지 못했습니다.",
+    "zoom-in": "서울 지역을 더 확대하면 정비사업 구역이 표시됩니다.",
+    error: "정비사업 구역을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
   } satisfies Record<PolicyStatus, string>;
   const selectedProgramLabels = selectedPlanningZone
     ? programTagLabels([
@@ -2735,7 +2942,7 @@ export function KakaoMapWorkspace({
             <section aria-live="polite" className="parcel-detail policy-detail">
               <div className="parcel-detail__header">
                 <div>
-                  <p className="eyebrow">선택 정책사업 구역</p>
+                  <p className="eyebrow">선택 정비사업 구역</p>
                   <h2>{selectedPolicyZone.projectName}</h2>
                 </div>
                 <div className="parcel-detail__tags">
@@ -2772,14 +2979,21 @@ export function KakaoMapWorkspace({
                   </dd>
                 </div>
                 <div>
+                  <dt>고시일</dt>
+                  <dd>{selectedPolicyZone.noticeDate || "-"}</dd>
+                </div>
+                <div>
                   <dt>자료 기준일</dt>
-                  <dd>{selectedPolicyZone.sourceBaseDate || "-"}</dd>
+                  <dd>{policySource?.sourceBaseDate || "-"}</dd>
                 </div>
               </dl>
 
               <a
                 className="maintenance-official__link"
-                href={selectedPolicyZone.sourceUrl}
+                href={
+                  policySource?.sourceUrl ??
+                  "https://data.seoul.go.kr/dataList/OA-22712/F/1/datasetView.do"
+                }
                 rel="noreferrer"
                 target="_blank"
               >
@@ -2788,9 +3002,9 @@ export function KakaoMapWorkspace({
 
               <p className="parcel-detail__notice">
                 <Info aria-hidden="true" size={15} />
-                {selectedPolicyZone.sourceName} ({selectedPolicyZone.sourceLicense}).
-                법적 효력이 없는 참고 자료이며, 최신 추진 단계는 관할 자치구 고시를
-                확인해 주세요.
+                {policySource?.sourceName} ({policySource?.sourceLicense}). 법적
+                효력이 없는 참고 자료이며, 최신 추진 단계는 관할 자치구 고시를 확인해
+                주세요.
               </p>
             </section>
           ) : null}
@@ -3054,22 +3268,32 @@ export function KakaoMapWorkspace({
           >
             <div>
               <Sparkles aria-hidden="true" size={18} />
-              <span>신속통합·모아타운</span>
+              <span>서울 정비사업 구역</span>
             </div>
             <span className="map-layer-preview__status">
               {policyLayerEnabled ? "켜짐" : "꺼짐"}
             </span>
           </button>
 
-          <div aria-label="정책사업 구역 색상" className="planning-legend">
-            <span>
-              <i className="planning-legend__swatch planning-legend__swatch--fast-track" />
-              신속통합기획
-            </span>
-            <span>
-              <i className="planning-legend__swatch planning-legend__swatch--moa" />
-              모아타운
-            </span>
+          <div aria-label="서울 정비사업 구역 색상" className="planning-legend">
+            {(
+              [
+                "redevelopment",
+                "reconstruction",
+                "fast-track",
+                "moa-town",
+                "small-scale",
+                "promotion",
+                "residential"
+              ] as ProjectZoneCategory[]
+            ).map((category) => (
+              <span key={category}>
+                <i
+                  className={`planning-legend__swatch planning-legend__swatch--zone-${category}`}
+                />
+                {PROJECT_ZONE_CATEGORY_LABELS[category]}
+              </span>
+            ))}
           </div>
 
           <p
@@ -3102,9 +3326,9 @@ export function KakaoMapWorkspace({
               ))}
             </div>
             <p>
-              신속통합기획·모아타운 구역은 서울플랜+ 공간정보(공공누리 제4유형)를
-              비상업 목적으로 지도에 표시합니다. 집계 건수와 최신 단계는 위 공식
-              원문이 기준이며, 지도 표시는 참고 자료입니다.
+              서울 정비사업 구역(재개발·재건축·신속통합기획·모아타운 등)은 서울플랜+
+              공간정보(공공누리 제4유형)를 비상업 목적으로 지도에 표시합니다. 집계
+              건수와 최신 단계는 위 공식 원문이 기준이며, 지도 표시는 참고 자료입니다.
             </p>
           </section>
 
@@ -3158,7 +3382,7 @@ export function KakaoMapWorkspace({
           <div className="map-source-badge">
             {developmentLayerEnabled ? "공공주택·도심복합지구 © 국토교통부 · " : ""}
             {planningLayerEnabled ? "정비·개발계획 © VWorld · " : ""}
-            {policyLayerEnabled ? "신속통합·모아타운 © 서울특별시 서울플랜+ · " : ""}
+            {policyLayerEnabled ? "서울 정비사업 구역 © 서울특별시 서울플랜+ · " : ""}
             {parcelLayerEnabled ? "필지 © VWorld · " : ""}
             지도 © Kakao
           </div>

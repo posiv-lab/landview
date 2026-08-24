@@ -2181,15 +2181,36 @@ button:disabled {
   background: #0f766e;
 }
 
-.planning-legend__swatch--fast-track {
+/* 서울 정비사업 구역 범례 — 폴리곤 색과 1:1로 맞춘다 */
+.planning-legend__swatch--zone-redevelopment {
+  background: #b91c1c;
+}
+
+.planning-legend__swatch--zone-reconstruction {
+  background: #1d4ed8;
+}
+
+.planning-legend__swatch--zone-fast-track {
   background: #c2410c;
 }
 
-.planning-legend__swatch--moa {
+.planning-legend__swatch--zone-moa-town {
   background: #7e22ce;
 }
 
-/* 신속통합·모아타운 레이어 토글 */
+.planning-legend__swatch--zone-small-scale {
+  background: #047857;
+}
+
+.planning-legend__swatch--zone-promotion {
+  background: #a16207;
+}
+
+.planning-legend__swatch--zone-residential {
+  background: #4338ca;
+}
+
+/* 서울 정비사업 구역 레이어 토글 */
 .map-layer-preview--policy {
   margin-top: var(--space-400);
 }
