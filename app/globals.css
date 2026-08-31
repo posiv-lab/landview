@@ -2044,6 +2044,38 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* 공람·계획 단계 — 구역지정 고시 전이므로 확정 구역과 확실히 구분한다 */
+.map-project-pin--planning .map-project-pin__body {
+  border-style: dashed;
+  border-color: #94a3b8;
+  background: #475569;
+}
+
+.map-project-pin--planning:hover .map-project-pin__body,
+.map-project-pin--planning:focus-visible .map-project-pin__body {
+  background: #334155;
+}
+
+.map-project-pin--planning .map-project-pin__tail {
+  border-top-color: #475569;
+}
+
+.map-project-pin--planning:hover .map-project-pin__tail,
+.map-project-pin--planning:focus-visible .map-project-pin__tail {
+  border-top-color: #334155;
+}
+
+.map-project-pin__badge--planning {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.map-project-pin--planning.map-project-pin--compact .map-project-pin__body {
+  border-style: dashed;
+  border-color: #ffffff;
+  background: #475569;
+}
+
 /* 신속통합기획·모아타운 등 정책 유형은 더 밝게 강조 */
 .map-project-pin__badge--program {
   background: #fde68a;
@@ -2248,6 +2280,11 @@ button:disabled {
 
 .planning-legend__swatch--zone-residential {
   background: #4338ca;
+}
+
+.planning-legend__swatch--phase-planning {
+  border: 1px dashed #475569;
+  background: transparent;
 }
 
 /* 서울 정비사업 구역 레이어 토글 */

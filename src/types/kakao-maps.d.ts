@@ -103,7 +103,7 @@ declare global {
       fillOpacity: number;
       strokeColor: string;
       strokeOpacity: number;
-      strokeStyle: "solid";
+      strokeStyle: "solid" | "shortdash" | "dash" | "dot";
       strokeWeight: number;
     }) => KakaoPolygon;
     event: {

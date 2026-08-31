@@ -468,6 +468,40 @@ const EMPTY_ZONE_COUNTS: Record<ProjectZoneCategory, number> = {
 
 // 같은 구역이 두 사업유형으로 등록된 경우(예: 재정비촉진구역 + 재개발) 이정표는 하나만
 // 세운다. 숫자가 작을수록 라벨 주인이 될 우선순위가 높다.
+// 구역지정 고시 전 단계(공람·계획). 법적으로 확정된 구역이 아니므로 색과 라벨을 구분한다.
+const PLANNING_PHASE_STAGES =
+  /예정구역|대상지선정|후보지|수립범위\s*자문|사전자문|정비계획수립|촉진계획수립|열람공고|입안제안|위원회심의|공람|주민합의체|기획완료|보류/u;
+
+// 구역지정 이후 단계는 확정으로 본다. 위 표현과 겹칠 때는 이쪽이 우선한다.
+const DESIGNATED_PHASE_STAGES =
+  /구역지정|지구지정|관리지역고시|조합설립|추진위|건축심의|사업시행|관리처분|착공|준공|이전고시|사업시행자\s*지정|특별정비구역\s*지정/u;
+
+function zonePhaseOf(stageName: string | undefined) {
+  const stage = (stageName ?? "").trim();
+
+  if (!stage) {
+    return "designated" as const;
+  }
+
+  if (DESIGNATED_PHASE_STAGES.test(stage)) {
+    return "designated" as const;
+  }
+
+  return PLANNING_PHASE_STAGES.test(stage)
+    ? ("planning" as const)
+    : ("designated" as const);
+}
+
+// 공람·계획 단계는 같은 갈래라도 점선 테두리와 옅은 채움으로 구분한다.
+function planningStyleOf(style: typeof DEFAULT_DEVELOPMENT_STYLE) {
+  return {
+    ...style,
+    strokeWeight: 2,
+    strokeOpacity: 0.85,
+    fillOpacity: 0.07
+  };
+}
+
 const ZONE_LABEL_PRIORITY: Record<ProjectZoneCategory, number> = {
   "legal-zone": 0,
   "new-town-special": 1,
@@ -908,17 +942,28 @@ const PROJECT_LABEL_MAX_LEVEL = 5;
 function createProjectPinElement({
   badges,
   compact,
+  phase = "designated",
   projectName
 }: {
   badges: ReturnType<typeof projectTypeBadges>;
   compact: boolean;
+  phase?: "designated" | "planning";
   projectName: string;
 }) {
-  const summary = [projectName, ...badges.map(({ label }) => label)].join(" · ");
+  const planning = phase === "planning";
+  const summary = [
+    projectName,
+    ...(planning ? ["공람·계획 단계"] : []),
+    ...badges.map(({ label }) => label)
+  ].join(" · ");
   const element = document.createElement("div");
-  element.className = compact
-    ? "map-project-pin map-project-pin--compact"
-    : "map-project-pin";
+  element.className = [
+    "map-project-pin",
+    compact ? "map-project-pin--compact" : "",
+    planning ? "map-project-pin--planning" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   element.setAttribute("role", "button");
   element.setAttribute("tabindex", "0");
   element.title = summary;
@@ -938,9 +983,19 @@ function createProjectPinElement({
     name.textContent = projectName;
     body.append(name);
 
-    if (badges.length > 0) {
+    if (planning || badges.length > 0) {
       const badgeList = document.createElement("span");
       badgeList.className = "map-project-pin__badges";
+
+      // 확정 구역과 헷갈리지 않도록 단계 배지를 맨 앞에 둔다.
+      if (planning) {
+        const phaseBadge = document.createElement("span");
+        phaseBadge.className =
+          "map-project-pin__badge map-project-pin__badge--planning";
+        phaseBadge.textContent = "공람·계획";
+        badgeList.append(phaseBadge);
+      }
+
       badges.forEach(({ kind, label }) => {
         const badge = document.createElement("span");
         badge.className = `map-project-pin__badge map-project-pin__badge--${kind}`;
@@ -1483,6 +1538,11 @@ export function KakaoMapWorkspace({
         }
 
         const category = feature.properties.category;
+        const phase = zonePhaseOf(feature.properties.stageName);
+        const zoneStyle =
+          phase === "planning"
+            ? planningStyleOf(PROJECT_ZONE_STYLES[category])
+            : PROJECT_ZONE_STYLES[category];
         const featurePolygons: KakaoPolygon[] = [];
         const polygons =
           feature.geometry.type === "Polygon"
@@ -1510,12 +1570,15 @@ export function KakaoMapWorkspace({
           const polygon = new maps.Polygon({
             map,
             path: paths.length === 1 ? paths[0] : paths,
-            strokeStyle: "solid",
-            ...PROJECT_ZONE_STYLES[category]
+            strokeStyle: phase === "planning" ? "shortdash" : "solid",
+            ...zoneStyle
           });
-          (
-            polygon as KakaoPolygon & { zoneCategory?: ProjectZoneCategory }
-          ).zoneCategory = category;
+          const tagged = polygon as KakaoPolygon & {
+            zoneCategory?: ProjectZoneCategory;
+            zoneBaseStyle?: typeof DEFAULT_DEVELOPMENT_STYLE;
+          };
+          tagged.zoneCategory = category;
+          tagged.zoneBaseStyle = zoneStyle;
           featurePolygons.push(polygon);
         });
 
@@ -1531,11 +1594,15 @@ export function KakaoMapWorkspace({
           clearSelectedDevelopmentProject();
 
           selectedPolicyPolygonsRef.current.forEach((polygon) => {
-            const previous = (
-              polygon as KakaoPolygon & { zoneCategory?: ProjectZoneCategory }
-            ).zoneCategory;
+            const tagged = polygon as KakaoPolygon & {
+              zoneCategory?: ProjectZoneCategory;
+              zoneBaseStyle?: typeof DEFAULT_DEVELOPMENT_STYLE;
+            };
             polygon.setOptions(
-              previous ? PROJECT_ZONE_STYLES[previous] : PROJECT_ZONE_STYLES.redevelopment
+              tagged.zoneBaseStyle ??
+                (tagged.zoneCategory
+                  ? PROJECT_ZONE_STYLES[tagged.zoneCategory]
+                  : PROJECT_ZONE_STYLES.redevelopment)
             );
           });
           featurePolygons.forEach((polygon) => {
@@ -1609,6 +1676,7 @@ export function KakaoMapWorkspace({
               projectType: feature.properties.projectType
             }),
             compact: useCompactPins,
+            phase,
             projectName: feature.properties.projectName
           });
           const labelClickHandler = () => {
@@ -2365,6 +2433,7 @@ export function KakaoMapWorkspace({
             projectType: project.projectType
           }),
           compact: useCompactPins,
+          phase: zonePhaseOf(project.businessStage),
           projectName: project.projectName
         });
 
@@ -3628,6 +3697,10 @@ export function KakaoMapWorkspace({
                 {PROJECT_ZONE_CATEGORY_LABELS[category]}
               </span>
             ))}
+            <span>
+              <i className="planning-legend__swatch planning-legend__swatch--phase-planning" />
+              공람·계획 단계(점선)
+            </span>
           </div>
 
           <p
